@@ -5,16 +5,22 @@
   "private": true,
   "scripts": {
     "start": "bun index.ts",
-    "dev": "bun --watch index.ts"
+    "dev": "bun --watch index.ts",
+    "test": "bun test"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.2.2"
   },
   "peerDependencies": {
     "typescript": "^7"
   },
   "dependencies": {
     "express": "^5.2.1",
-    "postgres": "^3.4.9"
+    "jsonwebtoken": "^9.0.3",
+    "postgres": "^3.4.9",
+    "zod": "^4.6.2"
   }
 }
