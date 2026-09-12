@@ -5,7 +5,7 @@ const userBaseSchema = z.object({
     .string({ error: "Name is required" })
     .trim()
     .nonempty({ error: "Name cannot be empty" }),
-  email: z.email({ error: "Invalid email address" }).trim().toLowerCase(),
+  email: z.email({ error: "Invalid email address" }).toLowerCase(),
   password: z
     .string({ error: "Password is required" })
     .min(8, { error: "Password must be at least 8 characters long" }),
