@@ -69,7 +69,7 @@ export async function login(
 
   try {
     const [user] =
-      await sql`SELECT id, password FROM users WHERE email = ${email}`;
+      await sql`SELECT id, password, role FROM users WHERE email = ${email}`;
 
     if (!user) {
       return res.status(401).json(invalidCredentialsResponse);
@@ -84,6 +84,7 @@ export async function login(
     const token = jwt.sign(
       {
         userId: user.id,
+        userRole: user.role,
       },
       JWT_SECRET,
       { expiresIn: "1d" },

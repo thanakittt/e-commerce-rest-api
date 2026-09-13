@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 
 export interface AuthRequest extends Request {
   userId?: number;
+  userRole?: string;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -23,7 +24,7 @@ export const authenticate = (
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({
       success: false,
-      message: "Authorization token missing or invalid",
+      message: "Unauthorized",
     });
   }
 
@@ -32,14 +33,28 @@ export const authenticate = (
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as {
       userId: number;
+      userRole: string;
     };
 
     req.userId = decoded.userId;
+    req.userRole = decoded.userRole;
     next();
   } catch {
     return res.status(401).json({
       success: false,
-      message: "Invalid or expired token",
+      message: "Unauthorized",
     });
   }
+};
+
+export const authorizeRoles = (roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.userRole || !roles.includes(req.userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+    next();
+  };
 };

@@ -1,12 +1,4 @@
-import {
-  describe,
-  beforeEach,
-  test,
-  afterAll,
-  it,
-  expect,
-  spyOn,
-} from "bun:test";
+import { describe, beforeEach, it, expect, spyOn } from "bun:test";
 import sql from "../db";
 import request from "supertest";
 import app from "../app";
@@ -15,9 +7,6 @@ beforeEach(async () => {
   await sql`TRUNCATE TABLE users RESTART IDENTITY CASCADE`;
 });
 
-afterAll(async () => {
-  await sql.end();
-});
 
 const validUserData = {
   name: "John Doe",
