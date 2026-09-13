@@ -23,9 +23,13 @@ const validUserData = {
   name: "John Doe",
   email: "jon@example.com",
   password: "password123",
+  phone: "0812345678",
 };
 
-const { name, ...validLoginData } = validUserData;
+const validLoginData = {
+  email: validUserData.email,
+  password: validUserData.password,
+};
 
 const sendRegisterRequest = (data: any) =>
   request(app).post("/api/auth/register").send(data);
@@ -34,7 +38,7 @@ const sendLoginRequest = (data: any) =>
   request(app).post("/api/auth/login").send(data);
 
 describe("POST /api/auth/register", () => {
-  it("should return 201 when payload is valid", async () => {
+  it("should return 201 when payload is valid with phone", async () => {
     // Act
     const res = await sendRegisterRequest(validUserData);
 
@@ -47,6 +51,28 @@ describe("POST /api/auth/register", () => {
         id: 1,
         name: "John Doe",
         email: "jon@example.com",
+        phone: "0812345678",
+      },
+    });
+  });
+
+  it("should return 201 when payload is valid without phone", async () => {
+    // Arrange
+    const { phone, ...userDataWithoutPhone } = validUserData;
+
+    // Act
+    const res = await sendRegisterRequest(userDataWithoutPhone);
+
+    // Assert
+    expect(res.status).toBe(201);
+    expect(res.body).toStrictEqual({
+      success: true,
+      message: "User registered successfully",
+      data: {
+        id: 1,
+        name: "John Doe",
+        email: "jon@example.com",
+        phone: null,
       },
     });
   });
@@ -55,6 +81,26 @@ describe("POST /api/auth/register", () => {
     // Act
     await sql`INSERT INTO users ${sql(validUserData)}`;
     const res = await sendRegisterRequest(validUserData);
+
+    // Assert
+    expect(res.status).toBe(409);
+    expect(res.body).toStrictEqual({
+      success: false,
+      message: "User already exists",
+    });
+  });
+
+  it("should return 409 when phone already exists", async () => {
+    // Arrange
+    await sql`INSERT INTO users ${sql(validUserData)}`;
+
+    // Act
+    const res = await sendRegisterRequest({
+      name: "Jane Doe",
+      email: "jane@example.com",
+      password: "password123",
+      phone: validUserData.phone,
+    });
 
     // Assert
     expect(res.status).toBe(409);

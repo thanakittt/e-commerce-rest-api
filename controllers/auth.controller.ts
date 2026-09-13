@@ -27,11 +27,13 @@ export async function register(
   res: Response,
   next: NextFunction,
 ) {
-  const { name, email, password } = req.body;
+  const { name, email, password, phone } = req.body;
 
   try {
     const existingUser = await sql`
-      SELECT id FROM users WHERE email = ${email}
+      SELECT id FROM users WHERE email = ${email} ${
+        phone ? sql`OR phone = ${phone}` : sql``
+      }
     `;
 
     if (existingUser.count > 0) {
@@ -41,7 +43,7 @@ export async function register(
     const hashedPassword = await Bun.password.hash(password);
 
     const newUser = await sql`
-      INSERT INTO users (name, email, password) VALUES (${name}, ${email}, ${hashedPassword}) RETURNING id, name, email
+      INSERT INTO users (name, email, password, phone) VALUES (${name}, ${email}, ${hashedPassword}, ${phone ?? null}) RETURNING id, name, email, phone
     `;
 
     return res.status(201).json({

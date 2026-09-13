@@ -9,6 +9,7 @@ const userBaseSchema = z.object({
   password: z
     .string({ error: "Password is required" })
     .min(8, { error: "Password must be at least 8 characters long" }),
+  phone: z.string().trim().optional(),
 });
 
 export const registerSchema = z.object({
@@ -16,8 +17,9 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  body: userBaseSchema.omit({ name: true }),
+  body: userBaseSchema.omit({ name: true, phone: true }),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>["body"];
 export type LoginInput = z.infer<typeof loginSchema>["body"];
+
