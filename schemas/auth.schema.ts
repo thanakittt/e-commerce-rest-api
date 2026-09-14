@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export const userIdSchema = z.object({
+  params: z.object({
+    id: z.coerce
+      .number({ error: "Invalid user ID" })
+      .int({ message: "User ID must be an integer" })
+      .positive({ message: "User ID must be a positive integer" }),
+  }),
+});
+
 const userBaseSchema = z.object({
   name: z
     .string({ error: "Name is required" })
@@ -20,6 +29,6 @@ export const loginSchema = z.object({
   body: userBaseSchema.omit({ name: true, phone: true }),
 });
 
+export type UserIdInput = z.input<typeof userIdSchema>["params"];
 export type RegisterInput = z.infer<typeof registerSchema>["body"];
 export type LoginInput = z.infer<typeof loginSchema>["body"];
-

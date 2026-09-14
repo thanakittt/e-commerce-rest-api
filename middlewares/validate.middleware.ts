@@ -29,8 +29,10 @@ export const validate =
       params?: unknown;
     };
     if (parsed.body !== undefined) req.body = parsed.body;
-    if (parsed.query !== undefined) req.query = parsed.query as Request["query"];
-    if (parsed.params !== undefined) req.params = parsed.params as Request["params"];
+    if (parsed.query !== undefined)
+      req.query = parsed.query as Request["query"];
+    if (parsed.params !== undefined)
+      req.params = parsed.params as Request["params"];
 
     next();
   };

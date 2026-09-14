@@ -1,11 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-export interface AuthRequest extends Request {
-  userId?: number;
-  userRole?: string;
-}
-
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
@@ -15,7 +10,7 @@ if (!JWT_SECRET) {
 }
 
 export const authenticate = (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) => {
@@ -48,7 +43,7 @@ export const authenticate = (
 };
 
 export const authorizeRoles = (roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     if (!req.userRole || !roles.includes(req.userRole)) {
       return res.status(403).json({
         success: false,

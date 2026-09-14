@@ -240,32 +240,76 @@ paths:
                   data:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 1
-                        name:
-                          type: string
-                          example: John Doe
-                        email:
-                          type: string
-                          format: email
-                          example: user@example.com
-                        phone:
-                          type: string
-                          nullable: true
-                          example: "0812345678"
-                        role:
-                          type: string
-                          enum:
-                            - user
-                            - admin
-                          example: user
+                      $ref: "#/components/schemas/User"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /users/{id}:
+    get:
+      summary: Get a user by ID
+      security:
+        - bearerAuth: []
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        "200":
+          description: User fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User fetched successfully
+                  data:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Validation failed
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        location:
+                          type: string
+                          example: params
+                        field:
+                          type: string
+                          example: id
+                        message:
+                          type: string
+                          example: Invalid user ID
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -275,6 +319,31 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        phone:
+          type: string
+          nullable: true
+          example: "0812345678"
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+          example: user
 
   responses:
     Unauthorized:
@@ -303,6 +372,19 @@ components:
               message:
                 type: string
                 example: Forbidden
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Not found
     InternalServerError:
       description: Internal server error
       content:
