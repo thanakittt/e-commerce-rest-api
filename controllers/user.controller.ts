@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import sql from "../db";
+import pg from "postgres";
 
 export async function getAllUsers(
   _req: Request,
@@ -53,6 +54,71 @@ export async function getUserById(
       data: user,
     });
   } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateUserById(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const idToUpdate = Number(req.params.id);
+    const { name, email, phone } = req.body;
+    const isOwner = req.userId === idToUpdate;
+    const isAdmin = req.userRole === "admin";
+    const hasPermission = isOwner || isAdmin;
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    const [user] = await sql`
+      UPDATE users 
+      SET name = ${name}, email = ${email}, phone = ${phone ?? null} 
+      WHERE id = ${idToUpdate} 
+      RETURNING id, name, email, phone, role;
+    `;
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      data: user,
+    });
+  } catch (error) {
+    if (error instanceof pg.PostgresError && error.code === "23505") {
+      const constraint = (
+        error.constraint_name ??
+        error.detail ??
+        ""
+      ).toLowerCase();
+
+      if (constraint.includes("email")) {
+        return res.status(409).json({
+          success: false,
+          message: "Email already exists",
+        });
+      }
+
+      if (constraint.includes("phone")) {
+        return res.status(409).json({
+          success: false,
+          message: "Phone already exists",
+        });
+      }
+    }
+
     next(error);
   }
 }

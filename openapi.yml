@@ -278,6 +278,65 @@ paths:
                   data:
                     $ref: "#/components/schemas/User"
         "400":
+          $ref: "#/components/responses/InvalidUserId"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      summary: Update a user by ID
+      security:
+        - bearerAuth: []
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+              properties:
+                name:
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                phone:
+                  type: string
+                  example: "0812345678"
+      responses:
+        "200":
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User updated successfully
+                  data:
+                    $ref: "#/components/schemas/User"
+        "400":
           description: Validation failed
           content:
             application/json:
@@ -297,19 +356,57 @@ paths:
                       properties:
                         location:
                           type: string
-                          example: params
                         field:
                           type: string
-                          example: id
                         message:
                           type: string
-                          example: Invalid user ID
+              examples:
+                invalidUserId:
+                  summary: Invalid user ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: id
+                        message: Invalid user ID
+                invalidBody:
+                  summary: Invalid body field
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: email
+                        message: Invalid email address
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflict - Duplicate email or phone number
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+              examples:
+                emailConflict:
+                  summary: Email conflict
+                  value:
+                    success: false
+                    message: Email already exists
+                phoneConflict:
+                  summary: Phone conflict
+                  value:
+                    success: false
+                    message: Phone already exists
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -372,6 +469,33 @@ components:
               message:
                 type: string
                 example: Forbidden
+    InvalidUserId:
+      description: Invalid user ID
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Validation failed
+              errors:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    location:
+                      type: string
+                      example: params
+                    field:
+                      type: string
+                      example: id
+                    message:
+                      type: string
+                      example: Invalid user ID
     NotFound:
       description: Not found
       content:

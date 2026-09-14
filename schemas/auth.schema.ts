@@ -29,6 +29,18 @@ export const loginSchema = z.object({
   body: userBaseSchema.omit({ name: true, phone: true }),
 });
 
+export const updateUserSchema = z.object({
+  params: userIdSchema.shape.params,
+  body: userBaseSchema
+    .pick({
+      name: true,
+      email: true,
+      phone: true,
+    })
+    .strict(),
+});
+
 export type UserIdInput = z.input<typeof userIdSchema>["params"];
 export type RegisterInput = z.infer<typeof registerSchema>["body"];
 export type LoginInput = z.infer<typeof loginSchema>["body"];
+export type UpdateUserInput = z.input<typeof updateUserSchema>;
