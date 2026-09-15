@@ -1,0 +1,89 @@
+import type { NextFunction, Request, Response } from "express";
+import sql from "../db";
+import pg from "postgres";
+import type { CreateProductInput } from "../schemas/product.schema";
+
+const PG_FOREIGN_KEY_VIOLATION = "23503";
+
+interface ProductRow {
+  id: number;
+  name: string;
+  description: string | null;
+  price: string;
+  category_id: number | null;
+  stock: number;
+}
+
+interface ProductResponse {
+  id: number;
+  name: string;
+  description: string | null;
+  price: number;
+  stock: number;
+  categoryId: number | null;
+}
+
+function formatProductResponse(product: ProductRow): ProductResponse {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    price: parseFloat(product.price),
+    stock: product.stock,
+    categoryId: product.category_id,
+  };
+}
+
+export async function createProduct(
+  req: Request<{}, {}, CreateProductInput>,
+  res: Response,
+  next: NextFunction,
+) {
+  const {
+    name,
+    description = null,
+    price,
+    stock,
+    categoryId = null,
+  } = req.body;
+
+  try {
+    const [newProduct] = await sql<[ProductRow]>`
+      INSERT INTO products (name, description, price, stock, category_id)
+      VALUES (
+        ${name},
+        ${description},
+        ${price},
+        ${stock},
+        ${categoryId}
+      )
+      RETURNING id, name, description, price, category_id, stock
+    `;
+
+    return res.status(201).json({
+      success: true,
+      message: "Product created successfully",
+      data: formatProductResponse(newProduct),
+    });
+  } catch (error) {
+    if (
+      error instanceof pg.PostgresError &&
+      error.code === PG_FOREIGN_KEY_VIOLATION
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "categoryId",
+            message: "Category not found",
+          },
+        ],
+      });
+    }
+
+    next(error);
+  }
+}
+

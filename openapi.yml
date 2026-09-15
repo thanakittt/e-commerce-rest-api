@@ -409,6 +409,110 @@ paths:
                     message: Phone already exists
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /products:
+    post:
+      summary: Create a new product
+      security:
+        - bearerAuth: []
+      tags:
+        - Products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - price
+                - stock
+              properties:
+                name:
+                  type: string
+                  example: Product 1
+                price:
+                  type: number
+                  minimum: 0
+                  exclusiveMinimum: true
+                  example: 100
+                stock:
+                  type: integer
+                  minimum: 0
+                  example: 10
+                description:
+                  type: string
+                  nullable: true
+                  example: Description 1
+                categoryId:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                  example: 1
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Product created successfully
+                  data:
+                    $ref: "#/components/schemas/Product"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Validation failed
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        location:
+                          type: string
+                        field:
+                          type: string
+                        message:
+                          type: string
+              examples:
+                missingField:
+                  summary: Missing required field
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: name
+                        message: Name is required
+                invalidCategory:
+                  summary: Invalid category ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: categoryId
+                        message: Category not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
 components:
   securitySchemes:
@@ -441,6 +545,30 @@ components:
             - user
             - admin
           example: user
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Product 1
+        price:
+          type: number
+          example: 100
+        stock:
+          type: integer
+          example: 10
+        description:
+          type: string
+          nullable: true
+          example: Description 1
+        categoryId:
+          type: integer
+          nullable: true
+          example: 1
 
   responses:
     Unauthorized:
