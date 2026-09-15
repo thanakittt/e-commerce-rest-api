@@ -121,6 +121,14 @@ const sendUpdateProductRequest = async (
   return token ? req.set("Authorization", `Bearer ${token}`) : req;
 };
 
+const sendDeleteProductRequest = async (
+  id: number | string,
+  token?: string,
+) => {
+  const req = request(app).delete(`/api/products/${id}`);
+  return token ? req.set("Authorization", `Bearer ${token}`) : req;
+};
+
 const mockDatabaseError = () => {
   spyOn(db, "default").mockRejectedValue(new Error("Simulated database error"));
   spyOn(console, "error").mockImplementation(() => {});
@@ -973,6 +981,160 @@ describe("PUT /api/products/:id", () => {
 
       // Act
       const res = await sendUpdateProductRequest(1, productData, token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("DELETE /api/products/:id", () => {
+  describe("Happy Path (200 OK)", () => {
+    it("should return 200 and delete the product when valid id is provided", async () => {
+      // Arrange
+      const product = await insertTestProduct();
+      const token = generateToken();
+
+      // Act
+      const res = await sendDeleteProductRequest(product.id, token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Product deleted successfully",
+      });
+
+      const [dbProduct] = await sql`
+        SELECT id FROM products WHERE id = ${product.id}
+      `;
+      expect(dbProduct).toBeUndefined();
+    });
+  });
+
+  describe("Validation Errors - Params (400)", () => {
+    const idValidationCases = [
+      {
+        scenario: "id is not a number",
+        id: "abc",
+        message: "Invalid product ID",
+      },
+      {
+        scenario: "id is not an integer",
+        id: "1.5",
+        message: "Product ID must be an integer",
+      },
+      {
+        scenario: "id is zero",
+        id: "0",
+        message: "Product ID must be a positive integer",
+      },
+      {
+        scenario: "id is negative",
+        id: "-1",
+        message: "Product ID must be a positive integer",
+      },
+    ];
+
+    it.each(idValidationCases)(
+      "should return 400 when $scenario",
+      async ({ id, message }) => {
+        // Arrange
+        const token = generateToken();
+
+        // Act
+        const res = await sendDeleteProductRequest(id, token);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "params",
+              field: "id",
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Authentication & Authorization (401 / 403)", () => {
+    it("should return 401 when user is not authenticated", async () => {
+      // Act
+      const res = await sendDeleteProductRequest(1);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Arrange
+      const invalidToken = "invalid_token";
+
+      // Act
+      const res = await sendDeleteProductRequest(1, invalidToken);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 403 when regular user tries to delete a product", async () => {
+      // Arrange
+      const token = generateToken({ userId: 1, userRole: "user" });
+
+      // Act
+      const res = await sendDeleteProductRequest(1, token);
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+    });
+  });
+
+  describe("Not Found (404)", () => {
+    it("should return 404 when product to delete is not found", async () => {
+      // Arrange
+      const token = generateToken();
+
+      // Act
+      const res = await sendDeleteProductRequest(99999, token);
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Product not found",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      mockDatabaseError();
+      const token = generateToken();
+
+      // Act
+      const res = await sendDeleteProductRequest(1, token);
 
       // Assert
       expect(res.status).toBe(500);

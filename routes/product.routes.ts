@@ -1,11 +1,13 @@
 import { Router } from "express";
 import {
   createProduct,
+  deleteProduct,
   updateProduct,
 } from "../controllers/product.controller";
 import { validate } from "../middlewares/validate.middleware";
 import {
   createProductSchema,
+  productIdSchema,
   updateProductSchema,
 } from "../schemas/product.schema";
 import { authenticate, authorizeRoles } from "../middlewares/auth.middleware";
@@ -26,6 +28,14 @@ productRouter.put(
   authorizeRoles(["admin"]),
   validate(updateProductSchema),
   updateProduct,
+);
+
+productRouter.delete(
+  "/:id",
+  authenticate,
+  authorizeRoles(["admin"]),
+  validate(productIdSchema),
+  deleteProduct,
 );
 
 export default productRouter;

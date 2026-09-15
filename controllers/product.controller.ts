@@ -148,3 +148,33 @@ export async function updateProduct(
   }
 }
 
+export async function deleteProduct(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+) {
+  const productId = Number(req.params.id);
+
+  try {
+    const [deletedProduct] = await sql<[ProductRow?]>`
+      DELETE FROM products
+      WHERE id = ${productId}
+      RETURNING id
+    `;
+
+    if (!deletedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Product deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
