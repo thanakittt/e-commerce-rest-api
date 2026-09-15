@@ -34,6 +34,28 @@ function formatProductResponse(product: ProductRow): ProductResponse {
   };
 }
 
+export async function getAllProducts(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const categoryId = req.query.categoryId;
+    const products =
+      categoryId !== undefined
+        ? await sql<ProductRow[]>`SELECT * FROM products WHERE category_id = ${categoryId as any}`
+        : await sql<ProductRow[]>`SELECT * FROM products`;
+
+    return res.status(200).json({
+      success: true,
+      message: "Products fetched successfully",
+      data: products.map(formatProductResponse),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function createProduct(
   req: Request<{}, {}, CreateProductInput>,
   res: Response,
@@ -177,4 +199,3 @@ export async function deleteProduct(
     next(error);
   }
 }
-

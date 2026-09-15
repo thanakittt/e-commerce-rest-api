@@ -129,6 +129,11 @@ const sendDeleteProductRequest = async (
   return token ? req.set("Authorization", `Bearer ${token}`) : req;
 };
 
+const sendGetAllProductsRequest = async (queryString?: string) => {
+  const url = queryString ? `/api/products?${queryString}` : "/api/products";
+  return request(app).get(url);
+};
+
 const mockDatabaseError = () => {
   spyOn(db, "default").mockRejectedValue(new Error("Simulated database error"));
   spyOn(console, "error").mockImplementation(() => {});
@@ -1135,6 +1140,151 @@ describe("DELETE /api/products/:id", () => {
 
       // Act
       const res = await sendDeleteProductRequest(1, token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("GET /api/products", () => {
+  describe("Happy Path (200 OK)", () => {
+    it("should return 200 and all products", async () => {
+      // Arrange
+      const category = await insertTestCategory();
+      const product1 = await insertTestProduct({
+        name: "Product 1",
+        categoryId: category.id,
+      });
+      const product2 = await insertTestProduct({
+        name: "Product 2",
+        categoryId: null,
+      });
+
+      // Act
+      const res = await sendGetAllProductsRequest();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Products fetched successfully",
+        data: [product1, product2],
+      });
+    });
+
+    it("should return 200 and empty list when no products are present", async () => {
+      // Act
+      const res = await sendGetAllProductsRequest();
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Products fetched successfully",
+        data: [],
+      });
+    });
+
+    it("should return 200 and filtered products when categoryId filter is applied", async () => {
+      // Arrange
+      const category1 = await insertTestCategory("Electronics");
+      const category2 = await insertTestCategory("Clothing");
+      const product1 = await insertTestProduct({
+        name: "Phone",
+        categoryId: category1.id,
+      });
+      await insertTestProduct({ name: "Shirt", categoryId: category2.id });
+      await insertTestProduct({ name: "Unknown Item", categoryId: null });
+
+      // Act
+      const res = await sendGetAllProductsRequest(`categoryId=${category1.id}`);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Products fetched successfully",
+        data: [product1],
+      });
+    });
+
+    it("should return 200 and empty list when categoryId has no matching products", async () => {
+      // Arrange
+      const category = await insertTestCategory();
+      await insertTestProduct({ categoryId: null });
+
+      // Act
+      const res = await sendGetAllProductsRequest(`categoryId=${category.id}`);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Products fetched successfully",
+        data: [],
+      });
+    });
+  });
+
+  describe("Validation Errors - Query (400)", () => {
+    const categoryIdValidationCases = [
+      {
+        scenario: "categoryId is not a number",
+        categoryId: "abc",
+        message: "Category ID must be a number",
+      },
+      {
+        scenario: "categoryId is not an integer",
+        categoryId: "1.5",
+        message: "Category ID must be an integer",
+      },
+      {
+        scenario: "categoryId is zero",
+        categoryId: "0",
+        message: "Category ID must be a positive integer",
+      },
+      {
+        scenario: "categoryId is negative",
+        categoryId: "-1",
+        message: "Category ID must be a positive integer",
+      },
+    ];
+
+    it.each(categoryIdValidationCases)(
+      "should return 400 when $scenario",
+      async ({ categoryId, message }) => {
+        // Act
+        const res = await sendGetAllProductsRequest(`categoryId=${categoryId}`);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "query",
+              field: "categoryId",
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      mockDatabaseError();
+
+      // Act
+      const res = await sendGetAllProductsRequest();
 
       // Assert
       expect(res.status).toBe(500);

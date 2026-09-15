@@ -183,6 +183,29 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   /products:
+    get:
+      summary: Get all products
+      tags:
+        - Products
+      parameters:
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Filter by category ID
+          example: 1
+      responses:
+        "200":
+          description: Products fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
     post:
       summary: Create a new product
       security:
@@ -567,6 +590,20 @@ components:
           example: Operation successful
         data:
           $ref: "#/components/schemas/Product"
+
+    ProductsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Products fetched successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
 
     MessageResponse:
       type: object

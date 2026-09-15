@@ -35,6 +35,18 @@ const productBaseSchema = z
   })
   .strict();
 
+export const getProductsQuerySchema = z.object({
+  query: z
+    .object({
+      categoryId: z.coerce
+        .number({ error: "Category ID must be a number" })
+        .int({ message: "Category ID must be an integer" })
+        .positive({ message: "Category ID must be a positive integer" })
+        .optional(),
+    })
+    .optional(),
+});
+
 export const createProductSchema = z.object({
   body: productBaseSchema,
 });
@@ -45,6 +57,8 @@ export const updateProductSchema = z.object({
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>["body"];
+export type GetProductsQueryInput = z.infer<
+  typeof getProductsQuerySchema
+>["query"];
 export type ProductIdInput = z.input<typeof productIdSchema>["params"];
 export type UpdateProductInput = z.input<typeof updateProductSchema>;
-
