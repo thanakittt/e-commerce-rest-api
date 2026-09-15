@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export const productIdSchema = z.object({
+  params: z.object({
+    id: z.coerce
+      .number({ error: "Invalid product ID" })
+      .int({ message: "Product ID must be an integer" })
+      .positive({ message: "Product ID must be a positive integer" }),
+  }),
+});
+
 const productBaseSchema = z
   .object({
     name: z
@@ -30,4 +39,12 @@ export const createProductSchema = z.object({
   body: productBaseSchema,
 });
 
+export const updateProductSchema = z.object({
+  params: productIdSchema.shape.params,
+  body: productBaseSchema,
+});
+
 export type CreateProductInput = z.infer<typeof createProductSchema>["body"];
+export type ProductIdInput = z.input<typeof productIdSchema>["params"];
+export type UpdateProductInput = z.input<typeof updateProductSchema>;
+

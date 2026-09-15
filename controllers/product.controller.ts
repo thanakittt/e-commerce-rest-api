@@ -87,3 +87,64 @@ export async function createProduct(
   }
 }
 
+export async function updateProduct(
+  req: Request<{ id: string }, {}, CreateProductInput>,
+  res: Response,
+  next: NextFunction,
+) {
+  const productId = Number(req.params.id);
+  const {
+    name,
+    description = null,
+    price,
+    stock,
+    categoryId = null,
+  } = req.body;
+
+  try {
+    const [updatedProduct] = await sql<[ProductRow]>`
+      UPDATE products
+      SET
+        name = ${name},
+        description = ${description},
+        price = ${price},
+        stock = ${stock},
+        category_id = ${categoryId}
+      WHERE id = ${productId}
+      RETURNING id, name, description, price, category_id, stock
+    `;
+
+    if (!updatedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      data: formatProductResponse(updatedProduct),
+    });
+  } catch (error) {
+    if (
+      error instanceof pg.PostgresError &&
+      error.code === PG_FOREIGN_KEY_VIOLATION
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "categoryId",
+            message: "Category not found",
+          },
+        ],
+      });
+    }
+
+    next(error);
+  }
+}
+

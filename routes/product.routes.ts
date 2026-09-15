@@ -1,7 +1,13 @@
 import { Router } from "express";
-import { createProduct } from "../controllers/product.controller";
+import {
+  createProduct,
+  updateProduct,
+} from "../controllers/product.controller";
 import { validate } from "../middlewares/validate.middleware";
-import { createProductSchema } from "../schemas/product.schema";
+import {
+  createProductSchema,
+  updateProductSchema,
+} from "../schemas/product.schema";
 import { authenticate, authorizeRoles } from "../middlewares/auth.middleware";
 
 const productRouter = Router();
@@ -14,4 +20,13 @@ productRouter.post(
   createProduct,
 );
 
+productRouter.put(
+  "/:id",
+  authenticate,
+  authorizeRoles(["admin"]),
+  validate(updateProductSchema),
+  updateProduct,
+);
+
 export default productRouter;
+

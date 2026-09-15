@@ -4,6 +4,7 @@ info:
   version: "1.0"
 servers:
   - url: http://localhost:3000/api
+
 paths:
   /auth/register:
     post:
@@ -15,110 +16,21 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - name
-                - email
-                - password
-              properties:
-                name:
-                  type: string
-                  example: John Doe
-                email:
-                  type: string
-                  format: email
-                  example: user@example.com
-                password:
-                  type: string
-                  format: password
-                  minLength: 8
-                  example: P@ssw0rd123
-                phone:
-                  type: string
-                  example: "0812345678"
+              $ref: "#/components/schemas/RegisterInput"
       responses:
         "201":
           description: User created successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: User registered successfully
-                  data:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 1
-                      name:
-                        type: string
-                        example: John Doe
-                      email:
-                        type: string
-                        example: user@example.com
-                      phone:
-                        type: string
-                        nullable: true
-                        example: "0812345678"
+                $ref: "#/components/schemas/UserResponse"
         "400":
-          description: Validation failed
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: Validation failed
-                  errors:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        location:
-                          type: string
-                          example: body
-                        field:
-                          type: string
-                          example: email
-                        message:
-                          type: string
-                          example: Invalid email address
+          $ref: "#/components/responses/ValidationError"
         "409":
-          description: User already exists
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: User already exists
+          $ref: "#/components/responses/Conflict"
         "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: Internal server error
+          $ref: "#/components/responses/InternalServerError"
+
   /auth/login:
     post:
       summary: Login a user
@@ -129,93 +41,28 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: user@example.com
-                password:
-                  type: string
-                  format: password
-                  minLength: 8
-                  example: P@ssw0rd123
+              $ref: "#/components/schemas/LoginInput"
       responses:
         "200":
           description: User logged in successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: User logged in successfully
-                  data:
-                    type: object
-                    properties:
-                      token:
-                        type: string
-                        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                $ref: "#/components/schemas/LoginResponse"
         "400":
-          description: Validation failed
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: Validation failed
-                  errors:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        location:
-                          type: string
-                          example: body
-                        field:
-                          type: string
-                          example: email
-                        message:
-                          type: string
-                          example: Invalid email address
+          $ref: "#/components/responses/ValidationError"
         "401":
           description: Invalid credentials
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: Invalid credentials
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: Invalid credentials
         "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: Internal server error
+          $ref: "#/components/responses/InternalServerError"
+
   /users:
     get:
       summary: Get all users
@@ -229,24 +76,14 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: Users fetched successfully
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/UsersResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalServerError"
+
   /users/{id}:
     get:
       summary: Get a user by ID
@@ -255,28 +92,14 @@ paths:
       tags:
         - Users
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            example: 1
+        - $ref: "#/components/parameters/IdParam"
       responses:
         "200":
           description: User fetched successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: User fetched successfully
-                  data:
-                    $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/UserResponse"
         "400":
           $ref: "#/components/responses/InvalidUserId"
         "401":
@@ -294,72 +117,26 @@ paths:
       tags:
         - Users
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            example: 1
+        - $ref: "#/components/parameters/IdParam"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - name
-                - email
-              properties:
-                name:
-                  type: string
-                  example: John Doe
-                email:
-                  type: string
-                  format: email
-                  example: user@example.com
-                phone:
-                  type: string
-                  example: "0812345678"
+              $ref: "#/components/schemas/UpdateUserInput"
       responses:
         "200":
           description: User updated successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: User updated successfully
-                  data:
-                    $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/UserResponse"
         "400":
           description: Validation failed
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: Validation failed
-                  errors:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        location:
-                          type: string
-                        field:
-                          type: string
-                        message:
-                          type: string
+                $ref: "#/components/schemas/ValidationErrorResponse"
               examples:
                 invalidUserId:
                   summary: Invalid user ID
@@ -390,12 +167,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
+                $ref: "#/components/schemas/ErrorResponse"
               examples:
                 emailConflict:
                   summary: Email conflict
@@ -409,6 +181,7 @@ paths:
                     message: Phone already exists
         "500":
           $ref: "#/components/responses/InternalServerError"
+
   /products:
     post:
       summary: Create a new product
@@ -421,73 +194,20 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - name
-                - price
-                - stock
-              properties:
-                name:
-                  type: string
-                  example: Product 1
-                price:
-                  type: number
-                  minimum: 0
-                  exclusiveMinimum: true
-                  example: 100
-                stock:
-                  type: integer
-                  minimum: 0
-                  example: 10
-                description:
-                  type: string
-                  nullable: true
-                  example: Description 1
-                categoryId:
-                  type: integer
-                  minimum: 1
-                  nullable: true
-                  example: 1
+              $ref: "#/components/schemas/ProductInput"
       responses:
         "201":
           description: Product created successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: Product created successfully
-                  data:
-                    $ref: "#/components/schemas/Product"
+                $ref: "#/components/schemas/ProductResponse"
         "400":
           description: Validation failed
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  message:
-                    type: string
-                    example: Validation failed
-                  errors:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        location:
-                          type: string
-                        field:
-                          type: string
-                        message:
-                          type: string
+                $ref: "#/components/schemas/ValidationErrorResponse"
               examples:
                 missingField:
                   summary: Missing required field
@@ -514,6 +234,71 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /products/{id}:
+    put:
+      summary: Update a product by ID
+      security:
+        - bearerAuth: []
+      tags:
+        - Products
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "200":
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalidProductId:
+                  summary: Invalid product ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: id
+                        message: Invalid product ID
+                missingField:
+                  summary: Missing required field
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: name
+                        message: Name is required
+                invalidCategory:
+                  summary: Invalid category ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: categoryId
+                        message: Category not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -521,7 +306,101 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        example: 1
+
   schemas:
+    RegisterInput:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: P@ssw0rd123
+        phone:
+          type: string
+          example: "0812345678"
+
+    LoginInput:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: P@ssw0rd123
+
+    UpdateUserInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        phone:
+          type: string
+          example: "0812345678"
+
+    ProductInput:
+      type: object
+      required:
+        - name
+        - price
+        - stock
+      properties:
+        name:
+          type: string
+          example: Product 1
+        price:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          example: 100
+        stock:
+          type: integer
+          minimum: 0
+          example: 10
+        description:
+          type: string
+          nullable: true
+          example: Description 1
+        categoryId:
+          type: integer
+          minimum: 1
+          nullable: true
+          example: 1
+
     User:
       type: object
       properties:
@@ -570,83 +449,165 @@ components:
           nullable: true
           example: 1
 
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Error message
+
+    ValidationErrorItem:
+      type: object
+      properties:
+        location:
+          type: string
+          example: body
+        field:
+          type: string
+          example: email
+        message:
+          type: string
+          example: Invalid email address
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Validation failed
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationErrorItem"
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: User logged in successfully
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation successful
+        data:
+          $ref: "#/components/schemas/User"
+
+    UsersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Users fetched successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+
+    ProductResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation successful
+        data:
+          $ref: "#/components/schemas/Product"
+
   responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrorResponse"
+
     Unauthorized:
       description: Unauthorized
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              success:
-                type: boolean
-                example: false
-              message:
-                type: string
-                example: Unauthorized
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: Unauthorized
+
     Forbidden:
       description: Forbidden
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              success:
-                type: boolean
-                example: false
-              message:
-                type: string
-                example: Forbidden
-    InvalidUserId:
-      description: Invalid user ID
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              success:
-                type: boolean
-                example: false
-              message:
-                type: string
-                example: Validation failed
-              errors:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    location:
-                      type: string
-                      example: params
-                    field:
-                      type: string
-                      example: id
-                    message:
-                      type: string
-                      example: Invalid user ID
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: Forbidden
+
     NotFound:
       description: Not found
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              success:
-                type: boolean
-                example: false
-              message:
-                type: string
-                example: Not found
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: Not found
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: Resource already exists
+
+    InvalidUserId:
+      description: Invalid user ID
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrorResponse"
+          example:
+            success: false
+            message: Validation failed
+            errors:
+              - location: params
+                field: id
+                message: Invalid user ID
+
     InternalServerError:
       description: Internal server error
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              success:
-                type: boolean
-                example: false
-              message:
-                type: string
-                example: Internal server error
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: Internal server error
