@@ -1,4 +1,4 @@
-import "express";
+import type { Request } from "express";
 
 declare global {
   namespace Express {
@@ -8,3 +8,14 @@ declare global {
     }
   }
 }
+
+export interface AuthenticatedRequest<
+  P = any,
+  ResBody = any,
+  ReqBody = any,
+  ReqQuery = any,
+> extends Request<P, ResBody, ReqBody, ReqQuery> {
+  userId: number;
+  userRole: string;
+}
+

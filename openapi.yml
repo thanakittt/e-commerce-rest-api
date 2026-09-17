@@ -350,6 +350,65 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /carts:
+    post:
+      summary: Add product to cart
+      security:
+        - bearerAuth: []
+      tags:
+        - Carts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddToCartInput"
+      responses:
+        "200":
+          description: Product added to cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                missingField:
+                  summary: Missing required field
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: productId
+                        message: Product ID is required
+                insufficientStock:
+                  summary: Insufficient stock
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: quantity
+                        message: Requested quantity exceeds available stock
+                productNotFound:
+                  summary: Product not found
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: productId
+                        message: Product not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -452,6 +511,21 @@ components:
           nullable: true
           example: 1
 
+    AddToCartInput:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+          minimum: 1
+          example: 1
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
     User:
       type: object
       properties:
@@ -499,6 +573,46 @@ components:
           type: integer
           nullable: true
           example: 1
+
+    CartItem:
+      type: object
+      properties:
+        productId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Product 1
+        price:
+          type: number
+          example: 100
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+        subtotal:
+          type: number
+          example: 200
+
+    Cart:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          example: 1
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        totalQuantity:
+          type: integer
+          example: 2
+        totalPrice:
+          type: number
+          example: 200
 
     ErrorResponse:
       type: object
@@ -604,6 +718,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Product"
+
+    CartResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Product added to cart successfully
+        data:
+          $ref: "#/components/schemas/Cart"
 
     MessageResponse:
       type: object
