@@ -102,6 +102,44 @@ const insertTestCartItem = async (
   };
 };
 
+const setupTestCartWithItems = async (user: Pick<TestUser, "id">) => {
+  const cart = await insertTestCart(user);
+  const productA = await insertTestProduct({ name: "Product A", price: 100 });
+  const productB = await insertTestProduct({ name: "Product B", price: 200 });
+  const cartItemA = await insertTestCartItem(cart.id, productA.id, 2);
+  const cartItemB = await insertTestCartItem(cart.id, productB.id, 3);
+
+  const subtotalA = cartItemA.quantity * productA.price;
+  const subtotalB = cartItemB.quantity * productB.price;
+  const totalPrice = subtotalA + subtotalB;
+  const totalQuantity = cartItemA.quantity + cartItemB.quantity;
+
+  const expectedData = {
+    id: cart.id,
+    userId: user.id,
+    items: [
+      {
+        productId: productA.id,
+        name: productA.name,
+        price: productA.price,
+        quantity: cartItemA.quantity,
+        subtotal: subtotalA,
+      },
+      {
+        productId: productB.id,
+        name: productB.name,
+        price: productB.price,
+        quantity: cartItemB.quantity,
+        subtotal: subtotalB,
+      },
+    ],
+    totalPrice,
+    totalQuantity,
+  };
+
+  return { cart, expectedData };
+};
+
 const generateToken = (
   user: Pick<TestUser, "id" | "role">,
   expiresIn: string | number = "1d",
@@ -124,6 +162,12 @@ const sendAddToCartRequest = async (
   if (!tokenOrHeader) return req;
   const headerValue = rawHeader ? tokenOrHeader : `Bearer ${tokenOrHeader}`;
   return req.set("Authorization", headerValue);
+};
+
+const sendGetCartRequest = async (id: string | number, token?: string) => {
+  const req = request(app).get(`/api/carts/${id}`);
+  if (!token) return req;
+  return req.set("Authorization", `Bearer ${token}`);
 };
 
 const mockDatabaseError = () => {
@@ -763,6 +807,194 @@ describe("POST /api/carts", () => {
         { productId: 1, quantity: 1 },
         token,
       );
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("GET /api/carts/:id", () => {
+  describe("Happy Path (200 OK)", () => {
+    it("should return 200 and cart details when user requests own cart", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const { cart, expectedData } = await setupTestCartWithItems(user);
+
+      // Act
+      const res = await sendGetCartRequest(cart.id, token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Cart fetched successfully",
+        data: expectedData,
+      });
+    });
+
+    it("should return 200 and cart details when admin requests another user's cart", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const admin = await insertTestUser({ role: "admin" });
+      const token = generateToken(admin);
+      const { cart, expectedData } = await setupTestCartWithItems(user);
+
+      // Act
+      const res = await sendGetCartRequest(cart.id, token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Cart fetched successfully",
+        data: expectedData,
+      });
+    });
+
+    it("should return 200 with empty items when cart exists but has no items", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const cart = await insertTestCart(user);
+
+      // Act
+      const res = await sendGetCartRequest(cart.id, token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Cart fetched successfully",
+        data: {
+          id: cart.id,
+          userId: user.id,
+          items: [],
+          totalPrice: 0,
+          totalQuantity: 0,
+        },
+      });
+    });
+  });
+
+  describe("Validation Errors - Schema (400 Bad Request)", () => {
+    const validationCases = [
+      {
+        scenario: "cart id is not a number",
+        id: "abc",
+        message: "Cart ID is required",
+      },
+      {
+        scenario: "cart id is a float",
+        id: 1.5,
+        message: "Cart ID must be an integer",
+      },
+      {
+        scenario: "cart id is zero",
+        id: 0,
+        message: "Cart ID must be a positive integer",
+      },
+      {
+        scenario: "cart id is negative",
+        id: -1,
+        message: "Cart ID must be a positive integer",
+      },
+    ];
+
+    it.each(validationCases)(
+      "should return 400 when $scenario",
+      async ({ id, message }) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+
+        // Act
+        const res = await sendGetCartRequest(id, token);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "params",
+              field: "id",
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Authentication (401 Unauthorized)", () => {
+    it("should return 401 when user is unauthenticated", async () => {
+      // Act
+      const res = await sendGetCartRequest(1);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+  });
+
+  describe("Authorization (403 Forbidden)", () => {
+    it("should return 403 when user tries to access another user's cart", async () => {
+      // Arrange
+      const userA = await insertTestUser({ email: "userA@email.com" });
+      const cartA = await insertTestCart(userA);
+
+      const userB = await insertTestUser({ email: "userB@email.com" });
+      const tokenB = generateToken(userB);
+
+      // Act
+      const res = await sendGetCartRequest(cartA.id, tokenB);
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+    });
+  });
+
+  describe("Not Found (404 Not Found)", () => {
+    it("should return 404 when cart is not found", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+
+      // Act
+      const res = await sendGetCartRequest(999, token);
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Not found",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      mockDatabaseError();
+
+      // Act
+      const res = await sendGetCartRequest(1, token);
 
       // Assert
       expect(res.status).toBe(500);

@@ -16,3 +16,14 @@ export const createCartSchema = z.object({
 });
 
 export type CreateCartInput = z.infer<typeof createCartSchema>["body"];
+
+export const getCartByIdSchema = z.object({
+  params: z.object({
+    id: z.coerce
+      .number({ error: "Cart ID is required" })
+      .int({ error: "Cart ID must be an integer" })
+      .positive({ error: "Cart ID must be a positive integer" }),
+  }),
+});
+
+export type GetCartByIdInput = z.infer<typeof getCartByIdSchema>["params"];

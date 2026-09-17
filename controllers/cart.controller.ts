@@ -11,6 +11,11 @@ interface CartRow {
   id: number;
 }
 
+interface CartOwnerRow {
+  id: number;
+  user_id: number;
+}
+
 interface CartItemRow {
   id: number;
   name: string;
@@ -33,6 +38,36 @@ interface CartResponse {
   items: CartItemResponse[];
   totalPrice: number;
   totalQuantity: number;
+}
+
+function canAccessCart(
+  cartUserId: number,
+  userId: number,
+  role: string,
+): boolean {
+  return cartUserId === userId || role === "admin";
+}
+
+async function findCartById(cartId: number): Promise<CartOwnerRow | undefined> {
+  const [cart] = await sql<[CartOwnerRow?]>`
+    SELECT id, user_id FROM carts WHERE id = ${cartId}
+  `;
+  return cart;
+}
+
+async function getCartItems(cartId: number): Promise<CartItemRow[]> {
+  return sql<CartItemRow[]>`
+    SELECT
+      p.id,
+      p.name,
+      p.price,
+      ci.quantity,
+      (p.price * ci.quantity) AS subtotal
+    FROM cart_items AS ci
+    JOIN products AS p ON ci.product_id = p.id
+    WHERE ci.cart_id = ${cartId}
+    ORDER BY p.id ASC
+  `;
 }
 
 function sendValidationError(res: Response, field: string, message: string) {
@@ -128,18 +163,7 @@ export async function createCart(
       DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity
     `;
 
-    const cartItems = await sql<CartItemRow[]>`
-      SELECT
-        p.id,
-        p.name,
-        p.price,
-        ci.quantity,
-        (p.price * ci.quantity) AS subtotal
-      FROM cart_items AS ci
-      JOIN products AS p ON ci.product_id = p.id
-      WHERE ci.cart_id = ${cartId}
-      ORDER BY p.id ASC
-    `;
+    const cartItems = await getCartItems(cartId);
 
     return res.status(200).json({
       success: true,
@@ -151,3 +175,39 @@ export async function createCart(
   }
 }
 
+export async function getCartById(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = req.userId!;
+    const userRole = req.userRole!;
+    const cartId = Number(req.params.id);
+
+    const cart = await findCartById(cartId);
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    if (!canAccessCart(cart.user_id, userId, userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    const cartItems = await getCartItems(cartId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Cart fetched successfully",
+      data: formatCartResponse(cartId, cart.user_id, cartItems),
+    });
+  } catch (error) {
+    next(error);
+  }
+}

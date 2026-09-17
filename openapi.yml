@@ -409,6 +409,47 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /carts/{id}:
+    get:
+      summary: Get cart by ID
+      security:
+        - bearerAuth: []
+      tags:
+        - Carts
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Cart fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartResponse"
+              example:
+                success: true
+                message: Cart fetched successfully
+                data:
+                  id: 1
+                  userId: 1
+                  items:
+                    - productId: 1
+                      name: Product 1
+                      price: 100
+                      quantity: 2
+                      subtotal: 200
+                  totalPrice: 200
+                  totalQuantity: 2
+        "400":
+          $ref: "#/components/responses/InvalidCartId"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -599,6 +640,7 @@ components:
       properties:
         id:
           type: integer
+          nullable: true
           example: 1
         userId:
           type: integer
@@ -816,6 +858,20 @@ components:
               - location: params
                 field: id
                 message: Invalid product ID
+
+    InvalidCartId:
+      description: Invalid cart ID
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrorResponse"
+          example:
+            success: false
+            message: Validation failed
+            errors:
+              - location: params
+                field: id
+                message: Invalid cart ID
 
     InternalServerError:
       description: Internal server error
