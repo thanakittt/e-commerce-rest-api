@@ -211,3 +211,41 @@ export async function getCartById(
     next(error);
   }
 }
+
+export async function deleteCartById(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = req.userId!;
+    const userRole = req.userRole!;
+    const cartId = Number(req.params.id);
+
+    const cart = await findCartById(cartId);
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    if (!canAccessCart(cart.user_id, userId, userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    await sql`
+      DELETE FROM carts WHERE id = ${cartId}
+    `;
+
+    return res.status(200).json({
+      success: true,
+      message: "Cart deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+}

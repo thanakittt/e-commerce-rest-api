@@ -27,3 +27,7 @@ export const getCartByIdSchema = z.object({
 });
 
 export type GetCartByIdInput = z.infer<typeof getCartByIdSchema>["params"];
+
+export const deleteCartByIdSchema = getCartByIdSchema;
+
+export type DeleteCartByIdInput = z.infer<typeof deleteCartByIdSchema>["params"];

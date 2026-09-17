@@ -170,6 +170,12 @@ const sendGetCartRequest = async (id: string | number, token?: string) => {
   return req.set("Authorization", `Bearer ${token}`);
 };
 
+const sendDeleteCartRequest = async (id: string | number, token?: string) => {
+  const req = request(app).delete(`/api/carts/${id}`);
+  if (!token) return req;
+  return req.set("Authorization", `Bearer ${token}`);
+};
+
 const mockDatabaseError = () => {
   spyOn(db, "default").mockRejectedValue(new Error("Simulated database error"));
   spyOn(console, "error").mockImplementation(() => {});
@@ -995,6 +1001,213 @@ describe("GET /api/carts/:id", () => {
 
       // Act
       const res = await sendGetCartRequest(1, token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("DELETE /api/carts/:id", () => {
+  describe("Happy Path (200 OK)", () => {
+    it("should return 200 and delete the cart when user deletes own cart", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const { cart } = await setupTestCartWithItems(user);
+
+      // Act
+      const res = await sendDeleteCartRequest(cart.id, token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Cart deleted successfully",
+      });
+
+      const [cartInDb] = await sql`SELECT id FROM carts WHERE id = ${cart.id}`;
+      expect(cartInDb).toBeUndefined();
+
+      const itemsInDb =
+        await sql`SELECT * FROM cart_items WHERE cart_id = ${cart.id}`;
+      expect(itemsInDb).toHaveLength(0);
+    });
+
+    it("should return 200 and delete the cart when admin deletes another user's cart", async () => {
+      // Arrange
+      const user = await insertTestUser({ email: "user@email.com" });
+      const { cart } = await setupTestCartWithItems(user);
+
+      const admin = await insertTestUser({
+        email: "admin@email.com",
+        role: "admin",
+      });
+      const adminToken = generateToken(admin);
+
+      // Act
+      const res = await sendDeleteCartRequest(cart.id, adminToken);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Cart deleted successfully",
+      });
+
+      const [cartInDb] = await sql`SELECT id FROM carts WHERE id = ${cart.id}`;
+      expect(cartInDb).toBeUndefined();
+    });
+  });
+
+  describe("Validation Errors - Schema (400 Bad Request)", () => {
+    const validationCases = [
+      {
+        scenario: "cart id is not a number",
+        id: "abc",
+        message: "Cart ID is required",
+      },
+      {
+        scenario: "cart id is a float",
+        id: 1.5,
+        message: "Cart ID must be an integer",
+      },
+      {
+        scenario: "cart id is zero",
+        id: 0,
+        message: "Cart ID must be a positive integer",
+      },
+      {
+        scenario: "cart id is negative",
+        id: -1,
+        message: "Cart ID must be a positive integer",
+      },
+    ];
+
+    it.each(validationCases)(
+      "should return 400 when $scenario",
+      async ({ id, message }) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+
+        // Act
+        const res = await sendDeleteCartRequest(id, token);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "params",
+              field: "id",
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Authentication (401 Unauthorized)", () => {
+    it("should return 401 when user is unauthenticated", async () => {
+      // Act
+      const res = await sendDeleteCartRequest(1);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Act
+      const res = await sendDeleteCartRequest(1, "invalid-token");
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is expired", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const expiredToken = generateToken(user, "-1s");
+
+      // Act
+      const res = await sendDeleteCartRequest(1, expiredToken);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+  });
+
+  describe("Authorization (403 Forbidden)", () => {
+    it("should return 403 when user tries to delete another user's cart", async () => {
+      // Arrange
+      const userA = await insertTestUser({ email: "userA@email.com" });
+      const { cart: cartA } = await setupTestCartWithItems(userA);
+
+      const userB = await insertTestUser({ email: "userB@email.com" });
+      const tokenB = generateToken(userB);
+
+      // Act
+      const res = await sendDeleteCartRequest(cartA.id, tokenB);
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+
+      const [cartInDb] = await sql`SELECT id FROM carts WHERE id = ${cartA.id}`;
+      expect(cartInDb).toBeDefined();
+    });
+  });
+
+  describe("Not Found (404 Not Found)", () => {
+    it("should return 404 when cart is not found", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+
+      // Act
+      const res = await sendDeleteCartRequest(999, token);
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Not found",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      mockDatabaseError();
+
+      // Act
+      const res = await sendDeleteCartRequest(1, token);
 
       // Assert
       expect(res.status).toBe(500);
