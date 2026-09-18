@@ -186,6 +186,20 @@ const sendDeleteCartItemRequest = async (
   return req.set("Authorization", `Bearer ${token}`);
 };
 
+const sendUpdateCartItemRequest = async (
+  cartId: string | number,
+  productId: string | number,
+  body?: Record<string, unknown>,
+  token?: string,
+) => {
+  const req = request(app).put(`/api/carts/${cartId}/items/${productId}`);
+  if (body !== undefined) {
+    req.send(body);
+  }
+  if (!token) return req;
+  return req.set("Authorization", `Bearer ${token}`);
+};
+
 const mockDatabaseError = () => {
   spyOn(db, "default").mockRejectedValue(new Error("Simulated database error"));
   spyOn(console, "error").mockImplementation(() => {});
@@ -1297,11 +1311,11 @@ describe("DELETE /api/carts/:cartId/items/:productId", () => {
       const token = generateToken(user);
       const { cart } = await setupTestCartWithItems(user);
 
-      const items = await sql`
+      const items = await sql<{ product_id: number }[]>`
         SELECT product_id FROM cart_items WHERE cart_id = ${cart.id} ORDER BY product_id ASC
       `;
-      const productToDeleteId = items[0].product_id;
-      const productToKeepId = items[1].product_id;
+      const productToDeleteId = items[0]!.product_id;
+      const productToKeepId = items[1]!.product_id;
 
       // Act
       const res = await sendDeleteCartItemRequest(
@@ -1317,11 +1331,11 @@ describe("DELETE /api/carts/:cartId/items/:productId", () => {
         message: "Item removed from cart successfully",
       });
 
-      const remainingItems = await sql`
+      const remainingItems = await sql<{ product_id: number }[]>`
         SELECT product_id FROM cart_items WHERE cart_id = ${cart.id}
       `;
       expect(remainingItems).toHaveLength(1);
-      expect(remainingItems[0].product_id).toBe(productToKeepId);
+      expect(remainingItems[0]!.product_id).toBe(productToKeepId);
     });
 
     it("should return 200 when item does not exist in cart (idempotent)", async () => {
@@ -1488,11 +1502,7 @@ describe("DELETE /api/carts/:cartId/items/:productId", () => {
       const tokenB = generateToken(userB);
 
       // Act
-      const res = await sendDeleteCartItemRequest(
-        cartA.id,
-        product.id,
-        tokenB,
-      );
+      const res = await sendDeleteCartItemRequest(cartA.id, product.id, tokenB);
 
       // Assert
       expect(res.status).toBe(403);
@@ -1537,6 +1547,565 @@ describe("DELETE /api/carts/:cartId/items/:productId", () => {
 
       // Act
       const res = await sendDeleteCartItemRequest(1, 1, token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("PUT /api/carts/:cartId/items/:productId", () => {
+  describe("Happy Path (200 OK)", () => {
+    it("should return 200 and updated cart details when updating an item in the cart", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const product = await insertTestProduct();
+      const cart = await insertTestCart(user);
+      await insertTestCartItem(cart.id, product.id, 2);
+      const newQuantity = 5;
+
+      const subtotal = product.price * newQuantity;
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        cart.id,
+        product.id,
+        { quantity: newQuantity },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Item quantity updated successfully",
+        data: {
+          id: cart.id,
+          userId: user.id,
+          items: [
+            {
+              productId: product.id,
+              name: product.name,
+              price: product.price,
+              quantity: newQuantity,
+              subtotal,
+            },
+          ],
+          totalPrice: subtotal,
+          totalQuantity: newQuantity,
+        },
+      });
+    });
+
+    it("should return 200 and updated cart details when admin updates an item in another user's cart", async () => {
+      // Arrange
+      const owner = await insertTestUser({ email: "owner@email.com" });
+      const admin = await insertTestUser({
+        email: "admin@email.com",
+        role: "admin",
+      });
+      const adminToken = generateToken(admin);
+      const product = await insertTestProduct();
+      const cart = await insertTestCart(owner);
+      await insertTestCartItem(cart.id, product.id, 2);
+      const newQuantity = 4;
+
+      const subtotal = product.price * newQuantity;
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        cart.id,
+        product.id,
+        { quantity: newQuantity },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Item quantity updated successfully",
+        data: {
+          id: cart.id,
+          userId: owner.id,
+          items: [
+            {
+              productId: product.id,
+              name: product.name,
+              price: product.price,
+              quantity: newQuantity,
+              subtotal,
+            },
+          ],
+          totalPrice: subtotal,
+          totalQuantity: newQuantity,
+        },
+      });
+    });
+
+    it("should return 200 and recalculate totalQuantity and totalPrice correctly when cart has multiple items", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const { cart } = await setupTestCartWithItems(user);
+      const itemsInDb = await sql<{ product_id: number }[]>`
+        SELECT product_id FROM cart_items WHERE cart_id = ${cart.id} ORDER BY product_id ASC
+      `;
+      const productAId = itemsInDb[0]!.product_id;
+      const productBId = itemsInDb[1]!.product_id;
+
+      const updatedQtyA = 4;
+      const originalQtyB = 3;
+      const subtotalA = 100 * updatedQtyA;
+      const subtotalB = 200 * originalQtyB;
+      const totalPrice = subtotalA + subtotalB;
+      const totalQuantity = updatedQtyA + originalQtyB;
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        cart.id,
+        productAId,
+        { quantity: updatedQtyA },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Item quantity updated successfully",
+        data: {
+          id: cart.id,
+          userId: user.id,
+          items: [
+            {
+              productId: productAId,
+              name: "Product A",
+              price: 100,
+              quantity: updatedQtyA,
+              subtotal: subtotalA,
+            },
+            {
+              productId: productBId,
+              name: "Product B",
+              price: 200,
+              quantity: originalQtyB,
+              subtotal: subtotalB,
+            },
+          ],
+          totalPrice,
+          totalQuantity,
+        },
+      });
+    });
+
+    it("should return 200 when updating quantity to exact product stock", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const product = await insertTestProduct({ stock: 5 });
+      const token = generateToken(user);
+      const cart = await insertTestCart(user);
+      await insertTestCartItem(cart.id, product.id, 1);
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        cart.id,
+        product.id,
+        { quantity: 5 },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body.data.totalQuantity).toBe(5);
+      expect(res.body.data.items[0].quantity).toBe(5);
+    });
+
+    it("should persist updated quantity in the database", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const product = await insertTestProduct();
+      const cart = await insertTestCart(user);
+      await insertTestCartItem(cart.id, product.id, 2);
+
+      // Act
+      await sendUpdateCartItemRequest(
+        cart.id,
+        product.id,
+        { quantity: 7 },
+        token,
+      );
+
+      // Assert
+      const [itemInDb] = await sql<[{ quantity: number }]>`
+        SELECT quantity FROM cart_items
+        WHERE cart_id = ${cart.id} AND product_id = ${product.id}
+      `;
+      expect(itemInDb.quantity).toBe(7);
+    });
+  });
+
+  describe("Validation Errors - Schema (400 Bad Request)", () => {
+    const routeParamValidationCases = [
+      {
+        scenario: "cart id is not a number",
+        cartId: "abc",
+        productId: 1,
+        field: "cartId",
+        message: "Cart ID is required",
+      },
+      {
+        scenario: "cart id is a float",
+        cartId: 1.5,
+        productId: 1,
+        field: "cartId",
+        message: "Cart ID must be an integer",
+      },
+      {
+        scenario: "cart id is zero",
+        cartId: 0,
+        productId: 1,
+        field: "cartId",
+        message: "Cart ID must be a positive integer",
+      },
+      {
+        scenario: "cart id is negative",
+        cartId: -1,
+        productId: 1,
+        field: "cartId",
+        message: "Cart ID must be a positive integer",
+      },
+      {
+        scenario: "product id is not a number",
+        cartId: 1,
+        productId: "abc",
+        field: "productId",
+        message: "Product ID is required",
+      },
+      {
+        scenario: "product id is a float",
+        cartId: 1,
+        productId: 1.5,
+        field: "productId",
+        message: "Product ID must be an integer",
+      },
+      {
+        scenario: "product id is zero",
+        cartId: 1,
+        productId: 0,
+        field: "productId",
+        message: "Product ID must be a positive integer",
+      },
+      {
+        scenario: "product id is negative",
+        cartId: 1,
+        productId: -1,
+        field: "productId",
+        message: "Product ID must be a positive integer",
+      },
+    ];
+
+    it.each(routeParamValidationCases)(
+      "should return 400 when $scenario",
+      async ({ cartId, productId, field, message }) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+
+        // Act
+        const res = await sendUpdateCartItemRequest(
+          cartId,
+          productId,
+          { quantity: 1 },
+          token,
+        );
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "params",
+              field,
+              message,
+            },
+          ],
+        });
+      },
+    );
+
+    const bodyValidationCases = [
+      {
+        scenario: "quantity is missing",
+        body: {},
+        field: "quantity",
+        message: "Quantity is required",
+      },
+      {
+        scenario: "quantity is not a number",
+        body: { quantity: "invalid" },
+        field: "quantity",
+        message: "Quantity is required",
+      },
+      {
+        scenario: "quantity is a float",
+        body: { quantity: 2.5 },
+        field: "quantity",
+        message: "Quantity must be an integer",
+      },
+      {
+        scenario: "quantity is zero",
+        body: { quantity: 0 },
+        field: "quantity",
+        message: "Quantity must be a positive integer",
+      },
+      {
+        scenario: "quantity is negative",
+        body: { quantity: -2 },
+        field: "quantity",
+        message: "Quantity must be a positive integer",
+      },
+    ];
+
+    it.each(bodyValidationCases)(
+      "should return 400 when $scenario",
+      async ({ body, field, message }) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+
+        // Act
+        const res = await sendUpdateCartItemRequest(1, 1, body, token);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "body",
+              field,
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Validation Errors - Business Logic (400 Bad Request)", () => {
+    it("should return 400 when requested quantity exceeds available stock", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const product = await insertTestProduct({ stock: 5 });
+      const token = generateToken(user);
+      const cart = await insertTestCart(user);
+      await insertTestCartItem(cart.id, product.id, 2);
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        cart.id,
+        product.id,
+        { quantity: 6 },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "quantity",
+            message: "Requested quantity exceeds available stock",
+          },
+        ],
+      });
+    });
+
+    it("should not modify cart item in database when stock validation fails", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const product = await insertTestProduct({ stock: 5 });
+      const token = generateToken(user);
+      const cart = await insertTestCart(user);
+      await insertTestCartItem(cart.id, product.id, 2);
+
+      // Act
+      await sendUpdateCartItemRequest(
+        cart.id,
+        product.id,
+        { quantity: 10 },
+        token,
+      );
+
+      // Assert
+      const [itemInDb] = await sql<[{ quantity: number }]>`
+        SELECT quantity FROM cart_items
+        WHERE cart_id = ${cart.id} AND product_id = ${product.id}
+      `;
+      expect(itemInDb.quantity).toBe(2);
+    });
+  });
+
+  describe("Authentication (401 Unauthorized)", () => {
+    it("should return 401 when user is unauthenticated", async () => {
+      // Act
+      const res = await sendUpdateCartItemRequest(1, 1, { quantity: 1 });
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        1,
+        1,
+        { quantity: 1 },
+        "invalid-token",
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is expired", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const expiredToken = generateToken(user, "-1s");
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        1,
+        1,
+        { quantity: 1 },
+        expiredToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+  });
+
+  describe("Authorization (403 Forbidden)", () => {
+    it("should return 403 when user tries to update item in another user's cart", async () => {
+      // Arrange
+      const userA = await insertTestUser({ email: "userA@email.com" });
+      const product = await insertTestProduct();
+      const cartA = await insertTestCart(userA);
+      await insertTestCartItem(cartA.id, product.id, 2);
+
+      const userB = await insertTestUser({ email: "userB@email.com" });
+      const tokenB = generateToken(userB);
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        cartA.id,
+        product.id,
+        { quantity: 5 },
+        tokenB,
+      );
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+
+      // Verify item quantity was not modified
+      const [itemInDb] = await sql<[{ quantity: number }]>`
+        SELECT quantity FROM cart_items
+        WHERE cart_id = ${cartA.id} AND product_id = ${product.id}
+      `;
+      expect(itemInDb.quantity).toBe(2);
+    });
+  });
+
+  describe("Not Found (404 Not Found)", () => {
+    it("should return 404 when cart is not found", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        999,
+        1,
+        { quantity: 1 },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Not found",
+      });
+    });
+
+    it("should return 404 when item does not exist in cart", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const cart = await insertTestCart(user);
+      const product = await insertTestProduct();
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        cart.id,
+        product.id,
+        { quantity: 1 },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Not found",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      mockDatabaseError();
+
+      // Act
+      const res = await sendUpdateCartItemRequest(
+        1,
+        1,
+        { quantity: 1 },
+        token,
+      );
 
       // Assert
       expect(res.status).toBe(500);

@@ -479,6 +479,108 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   /carts/{cartId}/items/{productId}:
+    put:
+      summary: Update item quantity in cart
+      security:
+        - bearerAuth: []
+      tags:
+        - Carts
+      parameters:
+        - name: cartId
+          in: path
+          required: true
+          description: ID of the cart
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+        - name: productId
+          in: path
+          required: true
+          description: ID of the product to update
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCartItemInput"
+      responses:
+        "200":
+          description: Item quantity updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartResponse"
+              example:
+                success: true
+                message: Item quantity updated successfully
+                data:
+                  id: 1
+                  userId: 1
+                  items:
+                    - productId: 1
+                      name: Product 1
+                      price: 100
+                      quantity: 3
+                      subtotal: 300
+                  totalPrice: 300
+                  totalQuantity: 3
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalidCartId:
+                  summary: Invalid cart ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: cartId
+                        message: Invalid cart ID
+                invalidProductId:
+                  summary: Invalid product ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: productId
+                        message: Invalid product ID
+                invalidQuantity:
+                  summary: Invalid quantity
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: quantity
+                        message: Quantity must be a positive integer
+                insufficientStock:
+                  summary: Insufficient stock
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: quantity
+                        message: Requested quantity exceeds available stock
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
     delete:
       summary: Remove an item from cart
       security:
@@ -662,6 +764,16 @@ components:
           type: integer
           minimum: 1
           example: 2
+
+    UpdateCartItemInput:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          example: 3
 
     User:
       type: object

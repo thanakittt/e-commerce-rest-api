@@ -288,3 +288,73 @@ export async function deleteCartItem(
     next(error);
   }
 }
+
+export async function updateCartItem(
+  req: Request<{ cartId: string; productId: string }, {}, { quantity: number }>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = req.userId!;
+    const userRole = req.userRole!;
+    const cartId = Number(req.params.cartId);
+    const productId = Number(req.params.productId);
+    const { quantity } = req.body;
+
+    const cart = await findCartById(cartId);
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    if (!canAccessCart(cart.user_id, userId, userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    const [cartItem] = await sql<[{ cart_id: number; product_id: number }?]>`
+      SELECT cart_id, product_id
+      FROM cart_items
+      WHERE cart_id = ${cartId} AND product_id = ${productId}
+    `;
+    if (!cartItem) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    const [product] = await sql<[ProductStock?]>`
+      SELECT id, stock FROM products WHERE id = ${productId}
+    `;
+
+    if (!product) {
+      return sendValidationError(res, "productId", "Product not found");
+    }
+
+    if (quantity > product.stock) {
+      return sendValidationError(
+        res,
+        "quantity",
+        "Requested quantity exceeds available stock",
+      );
+    }
+
+    await sql`
+      UPDATE cart_items SET quantity = ${quantity} WHERE cart_id = ${cartId} AND product_id = ${productId}
+    `;
+    const cartItems = await getCartItems(cartId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Item quantity updated successfully",
+      data: formatCartResponse(cartId, cart.user_id, cartItems),
+    });
+  } catch (error) {
+    next(error);
+  }
+}

@@ -4,6 +4,7 @@ import {
   deleteCartById,
   deleteCartItem,
   getCartById,
+  updateCartItem,
 } from "../controllers/cart.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
@@ -12,6 +13,7 @@ import {
   deleteCartByIdSchema,
   deleteCartItemSchema,
   getCartByIdSchema,
+  updateCartItemSchema,
 } from "../schemas/cart.schema";
 
 const cartRouter = Router();
@@ -32,6 +34,13 @@ cartRouter.delete(
   authenticate,
   validate(deleteCartItemSchema),
   deleteCartItem,
+);
+
+cartRouter.put(
+  "/:cartId/items/:productId",
+  authenticate,
+  validate(updateCartItemSchema),
+  updateCartItem,
 );
 
 export default cartRouter;
