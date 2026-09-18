@@ -478,6 +478,74 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /carts/{cartId}/items/{productId}:
+    delete:
+      summary: Remove an item from cart
+      security:
+        - bearerAuth: []
+      tags:
+        - Carts
+      parameters:
+        - name: cartId
+          in: path
+          required: true
+          description: ID of the cart
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+        - name: productId
+          in: path
+          required: true
+          description: ID of the product to remove
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        "200":
+          description: Item removed from cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                success: true
+                message: Item removed from cart successfully
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalidCartId:
+                  summary: Invalid cart ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: cartId
+                        message: Invalid cart ID
+                invalidProductId:
+                  summary: Invalid product ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: productId
+                        message: Invalid product ID
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:

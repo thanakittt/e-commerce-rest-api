@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createCart,
   deleteCartById,
+  deleteCartItem,
   getCartById,
 } from "../controllers/cart.controller";
 import { authenticate } from "../middlewares/auth.middleware";
@@ -9,6 +10,7 @@ import { validate } from "../middlewares/validate.middleware";
 import {
   createCartSchema,
   deleteCartByIdSchema,
+  deleteCartItemSchema,
   getCartByIdSchema,
 } from "../schemas/cart.schema";
 
@@ -23,6 +25,13 @@ cartRouter.delete(
   authenticate,
   validate(deleteCartByIdSchema),
   deleteCartById,
+);
+
+cartRouter.delete(
+  "/:cartId/items/:productId",
+  authenticate,
+  validate(deleteCartItemSchema),
+  deleteCartItem,
 );
 
 export default cartRouter;

@@ -249,3 +249,42 @@ export async function deleteCartById(
     next(error);
   }
 }
+
+export async function deleteCartItem(
+  req: Request<{ cartId: string; productId: string }>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = req.userId!;
+    const userRole = req.userRole!;
+    const cartId = Number(req.params.cartId);
+    const productId = Number(req.params.productId);
+
+    const cart = await findCartById(cartId);
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    if (!canAccessCart(cart.user_id, userId, userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    await sql`
+      DELETE FROM cart_items WHERE cart_id = ${cartId} AND product_id = ${productId}
+    `;
+
+    return res.status(200).json({
+      success: true,
+      message: "Item removed from cart successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
