@@ -1,5 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
-import type { CreateCartInput } from "../schemas/cart.schema";
+import type {
+  CheckoutBodyInput,
+  CheckoutParamsInput,
+  CreateCartInput,
+} from "../schemas/cart.schema";
 import sql from "../db";
 
 interface ProductStock {
@@ -353,6 +357,200 @@ export async function updateCartItem(
       success: true,
       message: "Item quantity updated successfully",
       data: formatCartResponse(cartId, cart.user_id, cartItems),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+interface CheckoutCartItemRow {
+  product_id: number;
+  name: string;
+  price: string;
+  quantity: number;
+  stock: number;
+}
+
+interface CreatedOrderRow {
+  id: number;
+  order_date: Date;
+  status: string;
+}
+
+interface ProcessCheckoutParams {
+  userId: number;
+  cartId: number;
+  shippingAddress: string;
+  paymentMethod: string;
+  cartItems: CheckoutCartItemRow[];
+}
+
+interface ProcessCheckoutResult {
+  order: CreatedOrderRow;
+  totalPrice: number;
+  totalQuantity: number;
+}
+
+async function getCheckoutCartItems(
+  cartId: number,
+): Promise<CheckoutCartItemRow[]> {
+  return sql<CheckoutCartItemRow[]>`
+    SELECT ci.quantity, p.price, p.name, p.stock, p.id AS product_id
+    FROM cart_items ci
+    JOIN products p ON ci.product_id = p.id
+    WHERE ci.cart_id = ${cartId}
+  `;
+}
+
+async function processOrderCheckout({
+  userId,
+  cartId,
+  shippingAddress,
+  paymentMethod,
+  cartItems,
+}: ProcessCheckoutParams): Promise<ProcessCheckoutResult> {
+  return sql.begin(async (tx) => {
+    const [order] = await tx<[CreatedOrderRow]>`
+      INSERT INTO orders (user_id, shipping_address, payment_method)
+      VALUES (${userId}, ${shippingAddress}, ${paymentMethod})
+      RETURNING id, order_date, status
+    `;
+
+    const orderItems = cartItems.map((item) => ({
+      order_id: order.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.price,
+    }));
+
+    await tx`
+      INSERT INTO order_items ${tx(orderItems)}
+    `;
+
+    await Promise.all(
+      orderItems.map(
+        (item) => tx`
+          UPDATE products
+          SET stock = stock - ${item.quantity}
+          WHERE id = ${item.product_id}
+        `,
+      ),
+    );
+
+    await tx`
+      DELETE FROM carts WHERE id = ${cartId}
+    `;
+
+    const totalQuantity = cartItems.reduce(
+      (sum, item) => sum + item.quantity,
+      0,
+    );
+    const totalPrice = cartItems.reduce(
+      (sum, item) => sum + item.quantity * Number(item.price),
+      0,
+    );
+
+    return {
+      order,
+      totalPrice,
+      totalQuantity,
+    };
+  });
+}
+
+function formatCheckoutResponse(
+  order: CreatedOrderRow,
+  userId: number,
+  shippingAddress: string,
+  paymentMethod: string,
+  totalPrice: number,
+  totalQuantity: number,
+  cartItems: CheckoutCartItemRow[],
+) {
+  return {
+    id: order.id,
+    userId,
+    shippingAddress,
+    paymentMethod,
+    orderDate: order.order_date,
+    status: order.status,
+    totalPrice,
+    totalQuantity,
+    items: cartItems.map((item) => ({
+      productId: item.product_id,
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: Number(item.price),
+      subtotal: item.quantity * Number(item.price),
+    })),
+  };
+}
+
+export async function checkout(
+  req: Request<{ id: string }, {}, CheckoutBodyInput>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = req.userId!;
+    const userRole = req.userRole!;
+    const cartId = Number(req.params.id);
+    const { shippingAddress, paymentMethod } = req.body;
+
+    const cart = await findCartById(cartId);
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    if (!canAccessCart(cart.user_id, userId, userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    const cartItems = await getCheckoutCartItems(cartId);
+    if (cartItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Cart is empty",
+      });
+    }
+
+    const hasInsufficientStock = cartItems.some(
+      (item) => item.quantity > item.stock,
+    );
+    if (hasInsufficientStock) {
+      return sendValidationError(
+        res,
+        "quantity",
+        "Requested quantity exceeds available stock",
+      );
+    }
+
+    const { order, totalPrice, totalQuantity } = await processOrderCheckout({
+      userId,
+      cartId,
+      shippingAddress,
+      paymentMethod,
+      cartItems,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Order created successfully",
+      data: formatCheckoutResponse(
+        order,
+        userId,
+        shippingAddress,
+        paymentMethod,
+        totalPrice,
+        totalQuantity,
+        cartItems,
+      ),
     });
   } catch (error) {
     next(error);

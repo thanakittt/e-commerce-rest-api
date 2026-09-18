@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  checkout,
   createCart,
   deleteCartById,
   deleteCartItem,
@@ -9,6 +10,7 @@ import {
 import { authenticate } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
+  checkoutSchema,
   createCartSchema,
   deleteCartByIdSchema,
   deleteCartItemSchema,
@@ -43,4 +45,12 @@ cartRouter.put(
   updateCartItem,
 );
 
+cartRouter.post(
+  "/:id/checkout",
+  authenticate,
+  validate(checkoutSchema),
+  checkout,
+);
+
 export default cartRouter;
+

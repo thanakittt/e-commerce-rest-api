@@ -648,6 +648,112 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /carts/{id}/checkout:
+    post:
+      summary: Checkout active cart and create an order
+      security:
+        - bearerAuth: []
+      tags:
+        - Carts
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "201":
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+              example:
+                success: true
+                message: Order created successfully
+                data:
+                  id: 1
+                  userId: 2
+                  shippingAddress: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
+                  paymentMethod: credit_card
+                  status: pending
+                  totalPrice: 289.49
+                  totalQuantity: 2
+                  orderDate: "2026-09-19T00:00:00.000Z"
+                  items:
+                    - productId: 1
+                      name: Wireless Noise-Cancelling Headphones
+                      quantity: 1
+                      unitPrice: 199.99
+                      subtotal: 199.99
+                    - productId: 2
+                      name: Mechanical Gaming Keyboard
+                      quantity: 1
+                      unitPrice: 89.50
+                      subtotal: 89.50
+        "400":
+          description: Validation failed or Cart is empty / Insufficient stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalidCartId:
+                  summary: Invalid cart ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: id
+                        message: Invalid cart ID
+                missingField:
+                  summary: Missing required field
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: shippingAddress
+                        message: Shipping address is required
+                invalidPaymentMethod:
+                  summary: Invalid payment method
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: paymentMethod
+                        message: Invalid payment method
+                emptyCart:
+                  summary: Cart is empty
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: cart
+                        message: Cart is empty
+                insufficientStock:
+                  summary: Insufficient stock
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: quantity
+                        message: Requested quantity exceeds available stock
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -774,6 +880,23 @@ components:
           type: integer
           minimum: 1
           example: 3
+
+    CheckoutInput:
+      type: object
+      required:
+        - shippingAddress
+        - paymentMethod
+      properties:
+        shippingAddress:
+          type: string
+          example: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
+        paymentMethod:
+          type: string
+          enum:
+            - credit_card
+            - paypal
+            - bank_transfer
+          example: credit_card
 
     User:
       type: object
@@ -990,6 +1113,76 @@ components:
         message:
           type: string
           example: Operation successful
+
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Wireless Noise-Cancelling Headphones
+        quantity:
+          type: integer
+          minimum: 1
+          example: 1
+        unitPrice:
+          type: number
+          example: 199.99
+        subtotal:
+          type: number
+          example: 199.99
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          example: 2
+        shippingAddress:
+          type: string
+          example: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
+        paymentMethod:
+          type: string
+          example: credit_card
+        status:
+          type: string
+          enum:
+            - pending
+            - paid
+            - shipped
+            - cancelled
+          example: pending
+        totalPrice:
+          type: number
+          example: 289.49
+        totalQuantity:
+          type: integer
+          example: 2
+        orderDate:
+          type: string
+          format: date-time
+          example: "2026-09-19T00:00:00.000Z"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+
+    OrderResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Order created successfully
+        data:
+          $ref: "#/components/schemas/Order"
 
   responses:
     ValidationError:

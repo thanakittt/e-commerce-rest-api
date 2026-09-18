@@ -56,6 +56,21 @@ export const updateCartItemSchema = z.object({
   }),
 });
 
+export const checkoutSchema = z.object({
+  body: z.object({
+    shippingAddress: z
+      .string({ error: "Shipping address is required" })
+      .trim()
+      .nonempty({ error: "Shipping address cannot be empty" }),
+    paymentMethod: z.enum(["credit_card", "paypal", "bank_transfer"], {
+      error: "Payment method must be one of: credit_card, paypal, bank_transfer",
+    }),
+  }),
+  params: z.object({
+    id: cartIdParam,
+  }),
+});
+
 // --- Inferred Types ---
 export type CreateCartInput = z.infer<typeof createCartSchema>["body"];
 export type GetCartByIdInput = z.infer<typeof getCartByIdSchema>["params"];
@@ -65,3 +80,6 @@ export type DeleteCartByIdInput = z.infer<
 export type DeleteCartItemInput = z.infer<
   typeof deleteCartItemSchema
 >["params"];
+export type CheckoutBodyInput = z.infer<typeof checkoutSchema>["body"];
+export type CheckoutParamsInput = z.infer<typeof checkoutSchema>["params"];
+

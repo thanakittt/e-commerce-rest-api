@@ -200,6 +200,21 @@ const sendUpdateCartItemRequest = async (
   return req.set("Authorization", `Bearer ${token}`);
 };
 
+const sendCheckoutRequest = async (
+  id: string | number,
+  body?: Record<string, unknown>,
+  tokenOrHeader?: string,
+  rawHeader = false,
+) => {
+  const req = request(app).post(`/api/carts/${id}/checkout`);
+  if (body !== undefined) {
+    req.send(body);
+  }
+  if (!tokenOrHeader) return req;
+  const headerValue = rawHeader ? tokenOrHeader : `Bearer ${tokenOrHeader}`;
+  return req.set("Authorization", headerValue);
+};
+
 const mockDatabaseError = () => {
   spyOn(db, "default").mockRejectedValue(new Error("Simulated database error"));
   spyOn(console, "error").mockImplementation(() => {});
@@ -207,7 +222,7 @@ const mockDatabaseError = () => {
 
 // --- Lifecycle Hooks ---
 beforeEach(async () => {
-  await sql`TRUNCATE TABLE users, products, carts RESTART IDENTITY CASCADE`;
+  await sql`TRUNCATE TABLE users, products, carts, cart_items, orders, order_items RESTART IDENTITY CASCADE`;
 });
 
 afterEach(() => {
@@ -2100,12 +2115,641 @@ describe("PUT /api/carts/:cartId/items/:productId", () => {
       mockDatabaseError();
 
       // Act
-      const res = await sendUpdateCartItemRequest(
-        1,
-        1,
-        { quantity: 1 },
-        token,
-      );
+      const res = await sendUpdateCartItemRequest(1, 1, { quantity: 1 }, token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("POST /api/carts/:id/checkout", () => {
+  describe("Happy Path (201 Created)", () => {
+    it("should return 201 and created order when checking out with a single item", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const product = await insertTestProduct({ price: 150, stock: 10 });
+      const cart = await insertTestCart(user);
+      const cartItem = await insertTestCartItem(cart.id, product.id, 2);
+
+      const subtotal = product.price * cartItem.quantity;
+      const remainingStock = product.stock - cartItem.quantity;
+
+      const body = {
+        shippingAddress: "123 Sukhumvit Rd, Bangkok",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(cart.id, body, token);
+
+      // Assert
+      expect(res.status).toBe(201);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order created successfully",
+        data: {
+          id: expect.any(Number),
+          userId: user.id,
+          shippingAddress: body.shippingAddress,
+          paymentMethod: body.paymentMethod,
+          status: "pending",
+          totalPrice: subtotal,
+          totalQuantity: cartItem.quantity,
+          orderDate: expect.any(String),
+          items: [
+            {
+              productId: product.id,
+              name: product.name,
+              quantity: cartItem.quantity,
+              unitPrice: product.price,
+              subtotal,
+            },
+          ],
+        },
+      });
+
+      // DB check - products stock
+      const [updatedProduct] = await sql<[{ stock: number }]>`
+        SELECT stock FROM products WHERE id = ${product.id}
+      `;
+      expect(updatedProduct.stock).toBe(remainingStock);
+
+      // DB check - cart deleted
+      const [cartInDb] = await sql<[{ id: number }?]>`
+        SELECT id FROM carts WHERE id = ${cart.id}
+      `;
+      expect(cartInDb).toBeUndefined();
+
+      // DB check - order and order_items created
+      const [orderInDb] = await sql<
+        [
+          {
+            id: number;
+            user_id: number;
+            shipping_address: string;
+            payment_method: string;
+            status: string;
+          }?,
+        ]
+      >`
+        SELECT id, user_id, shipping_address, payment_method, status FROM orders WHERE id = ${res.body.data.id}
+      `;
+      expect(orderInDb).toBeDefined();
+      expect(orderInDb?.user_id).toBe(user.id);
+      expect(orderInDb?.shipping_address).toBe(body.shippingAddress);
+      expect(orderInDb?.payment_method).toBe(body.paymentMethod);
+      expect(orderInDb?.status).toBe("pending");
+
+      const [orderItemInDb] = await sql<
+        [{ product_id: number; quantity: number; unit_price: string }?]
+      >`
+        SELECT product_id, quantity, unit_price FROM order_items WHERE order_id = ${res.body.data.id}
+      `;
+      expect(orderItemInDb).toBeDefined();
+      expect(orderItemInDb?.product_id).toBe(product.id);
+      expect(orderItemInDb?.quantity).toBe(cartItem.quantity);
+      expect(Number(orderItemInDb?.unit_price)).toBe(product.price);
+    });
+
+    it("should return 201 and created order when checking out with multiple items", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const productA = await insertTestProduct({
+        name: "Product A",
+        price: 100,
+        stock: 10,
+      });
+      const productB = await insertTestProduct({
+        name: "Product B",
+        price: 50.5,
+        stock: 5,
+      });
+      const cart = await insertTestCart(user);
+      const cartItemA = await insertTestCartItem(cart.id, productA.id, 2);
+      const cartItemB = await insertTestCartItem(cart.id, productB.id, 3);
+
+      const remainingStockA = productA.stock - cartItemA.quantity;
+      const remainingStockB = productB.stock - cartItemB.quantity;
+
+      const subtotalA = productA.price * cartItemA.quantity;
+      const subtotalB = productB.price * cartItemB.quantity;
+      const totalPrice = subtotalA + subtotalB;
+      const totalQuantity = cartItemA.quantity + cartItemB.quantity;
+
+      const body = {
+        shippingAddress: "456 Phahonyothin Rd, Bangkok",
+        paymentMethod: "bank_transfer",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(cart.id, body, token);
+
+      // Assert
+      expect(res.status).toBe(201);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order created successfully",
+        data: {
+          id: expect.any(Number),
+          userId: user.id,
+          shippingAddress: body.shippingAddress,
+          paymentMethod: body.paymentMethod,
+          status: "pending",
+          totalPrice,
+          totalQuantity,
+          orderDate: expect.any(String),
+          items: [
+            {
+              productId: productA.id,
+              name: productA.name,
+              quantity: cartItemA.quantity,
+              unitPrice: productA.price,
+              subtotal: subtotalA,
+            },
+            {
+              productId: productB.id,
+              name: productB.name,
+              quantity: cartItemB.quantity,
+              unitPrice: productB.price,
+              subtotal: subtotalB,
+            },
+          ],
+        },
+      });
+
+      const [updatedProductA] = await sql<[{ stock: number }]>`
+        SELECT stock FROM products WHERE id = ${productA.id}
+      `;
+      expect(updatedProductA.stock).toBe(remainingStockA);
+
+      const [updatedProductB] = await sql<[{ stock: number }]>`
+        SELECT stock FROM products WHERE id = ${productB.id}
+      `;
+      expect(updatedProductB.stock).toBe(remainingStockB);
+
+      const [cartInDb] = await sql<[{ id: number }?]>`
+        SELECT id FROM carts WHERE id = ${cart.id}
+      `;
+      expect(cartInDb).toBeUndefined();
+    });
+
+    it("should return 201 when purchasing exact remaining stock (stock drops to 0)", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const product = await insertTestProduct({ stock: 5 });
+      const cart = await insertTestCart(user);
+      await insertTestCartItem(cart.id, product.id, 5);
+
+      const body = {
+        shippingAddress: "789 Silom Rd, Bangkok",
+        paymentMethod: "paypal",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(cart.id, body, token);
+
+      // Assert
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+
+      const [updatedProduct] = await sql<[{ stock: number }]>`
+        SELECT stock FROM products WHERE id = ${product.id}
+      `;
+      expect(updatedProduct.stock).toBe(0);
+    });
+
+    it("should return 201 when admin checks out a user's cart", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const admin = await insertTestUser({
+        email: "admin@test.com",
+        role: "admin",
+      });
+      const adminToken = generateToken(admin);
+
+      const product = await insertTestProduct({ stock: 10 });
+      const cart = await insertTestCart(user);
+      await insertTestCartItem(cart.id, product.id, 2);
+
+      const body = {
+        shippingAddress: "Admin Office, Bangkok",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(cart.id, body, adminToken);
+
+      // Assert
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.userId).toBe(admin.id);
+    });
+  });
+
+  describe("Validation Errors - Schema (400 Bad Request)", () => {
+    const paramValidationCases = [
+      {
+        scenario: "cart id is not a number",
+        id: "abc",
+        message: "Cart ID is required",
+      },
+      {
+        scenario: "cart id is a float",
+        id: 1.5,
+        message: "Cart ID must be an integer",
+      },
+      {
+        scenario: "cart id is zero",
+        id: 0,
+        message: "Cart ID must be a positive integer",
+      },
+      {
+        scenario: "cart id is negative",
+        id: -1,
+        message: "Cart ID must be a positive integer",
+      },
+    ];
+
+    it.each(paramValidationCases)(
+      "should return 400 when $scenario",
+      async ({ id, message }) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+        const body = {
+          shippingAddress: "123 Main St",
+          paymentMethod: "credit_card",
+        };
+
+        // Act
+        const res = await sendCheckoutRequest(id, body, token);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "params",
+              field: "id",
+              message,
+            },
+          ],
+        });
+      },
+    );
+
+    const bodyValidationCases = [
+      {
+        scenario: "shippingAddress is missing",
+        body: { paymentMethod: "credit_card" },
+        field: "shippingAddress",
+        message: "Shipping address is required",
+      },
+      {
+        scenario: "shippingAddress is not a string",
+        body: { shippingAddress: 12345, paymentMethod: "credit_card" },
+        field: "shippingAddress",
+        message: "Shipping address is required",
+      },
+      {
+        scenario: "shippingAddress is empty string",
+        body: { shippingAddress: "", paymentMethod: "credit_card" },
+        field: "shippingAddress",
+        message: "Shipping address cannot be empty",
+      },
+      {
+        scenario: "shippingAddress contains only whitespace",
+        body: { shippingAddress: "   ", paymentMethod: "credit_card" },
+        field: "shippingAddress",
+        message: "Shipping address cannot be empty",
+      },
+      {
+        scenario: "paymentMethod is missing",
+        body: { shippingAddress: "123 Main St" },
+        field: "paymentMethod",
+        message:
+          "Payment method must be one of: credit_card, paypal, bank_transfer",
+      },
+      {
+        scenario: "paymentMethod is not a valid enum value",
+        body: { shippingAddress: "123 Main St", paymentMethod: "crypto" },
+        field: "paymentMethod",
+        message:
+          "Payment method must be one of: credit_card, paypal, bank_transfer",
+      },
+      {
+        scenario: "paymentMethod is not a string",
+        body: { shippingAddress: "123 Main St", paymentMethod: 123 },
+        field: "paymentMethod",
+        message:
+          "Payment method must be one of: credit_card, paypal, bank_transfer",
+      },
+    ];
+
+    it.each(bodyValidationCases)(
+      "should return 400 when $scenario",
+      async ({ body, field, message }) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+        const cart = await insertTestCart(user);
+
+        // Act
+        const res = await sendCheckoutRequest(cart.id, body, token);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "body",
+              field,
+              message,
+            },
+          ],
+        });
+      },
+    );
+
+    it("should return 400 with multiple errors when body is empty", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const cart = await insertTestCart(user);
+
+      // Act
+      const res = await sendCheckoutRequest(cart.id, {}, token);
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "shippingAddress",
+            message: "Shipping address is required",
+          },
+          {
+            location: "body",
+            field: "paymentMethod",
+            message:
+              "Payment method must be one of: credit_card, paypal, bank_transfer",
+          },
+        ],
+      });
+    });
+  });
+
+  describe("Validation Errors - Business Logic (400 Bad Request)", () => {
+    it("should return 400 when cart is empty", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const cart = await insertTestCart(user);
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(cart.id, body, token);
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Cart is empty",
+      });
+
+      // Verify cart still exists and no order created
+      const [cartInDb] = await sql<[{ id: number }?]>`
+        SELECT id FROM carts WHERE id = ${cart.id}
+      `;
+      expect(cartInDb).toBeDefined();
+
+      const ordersInDb = await sql`SELECT id FROM orders`;
+      expect(ordersInDb).toHaveLength(0);
+    });
+
+    it("should return 400 when item quantity exceeds available stock", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const product = await insertTestProduct({ stock: 3 });
+      const cart = await insertTestCart(user);
+      await insertTestCartItem(cart.id, product.id, 5);
+
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(cart.id, body, token);
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "quantity",
+            message: "Requested quantity exceeds available stock",
+          },
+        ],
+      });
+
+      // Verify stock untouched
+      const [productInDb] = await sql<[{ stock: number }]>`
+        SELECT stock FROM products WHERE id = ${product.id}
+      `;
+      expect(productInDb.stock).toBe(3);
+
+      // Verify cart still exists
+      const [cartInDb] = await sql<[{ id: number }?]>`
+        SELECT id FROM carts WHERE id = ${cart.id}
+      `;
+      expect(cartInDb).toBeDefined();
+
+      // Verify no order created
+      const ordersInDb = await sql`SELECT id FROM orders`;
+      expect(ordersInDb).toHaveLength(0);
+    });
+  });
+
+  describe("Authentication (401 Unauthorized)", () => {
+    it("should return 401 when user is unauthenticated (missing header)", async () => {
+      // Arrange
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(1, body);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when Authorization header does not start with Bearer", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(1, body, `Basic ${token}`, true);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Arrange
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(1, body, "invalid.token.here");
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is expired", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const expiredToken = generateToken(user, "-1s");
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(1, body, expiredToken);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+  });
+
+  describe("Authorization (403 Forbidden)", () => {
+    it("should return 403 when user tries to checkout another user's cart", async () => {
+      // Arrange
+      const userA = await insertTestUser({ email: "userA@email.com" });
+      const product = await insertTestProduct({ stock: 10 });
+      const cartA = await insertTestCart(userA);
+      await insertTestCartItem(cartA.id, product.id, 2);
+
+      const userB = await insertTestUser({ email: "userB@email.com" });
+      const tokenB = generateToken(userB);
+
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(cartA.id, body, tokenB);
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+
+      // Verify cart still exists
+      const [cartInDb] = await sql<[{ id: number }?]>`
+        SELECT id FROM carts WHERE id = ${cartA.id}
+      `;
+      expect(cartInDb).toBeDefined();
+
+      // Verify stock untouched
+      const [productInDb] = await sql<[{ stock: number }]>`
+        SELECT stock FROM products WHERE id = ${product.id}
+      `;
+      expect(productInDb.stock).toBe(10);
+
+      // Verify no order created
+      const ordersInDb = await sql`SELECT id FROM orders`;
+      expect(ordersInDb).toHaveLength(0);
+    });
+  });
+
+  describe("Not Found (404 Not Found)", () => {
+    it("should return 404 when cart is not found", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(99999, body, token);
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Not found",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      mockDatabaseError();
+      const body = {
+        shippingAddress: "123 Main St",
+        paymentMethod: "credit_card",
+      };
+
+      // Act
+      const res = await sendCheckoutRequest(1, body, token);
 
       // Assert
       expect(res.status).toBe(500);
