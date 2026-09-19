@@ -847,6 +847,66 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /orders/{id}/cancel:
+    patch:
+      summary: Cancel an order
+      description: Request order cancellation. Allowed only when order status is pending and accessible by the order owner (User).
+      security:
+        - bearerAuth: []
+      tags:
+        - Orders
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelOrderInput"
+      responses:
+        "200":
+          description: Order cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelOrderResponse"
+              example:
+                success: true
+                message: Order cancelled successfully
+                data:
+                  id: 1
+                  status: cancelled
+                  cancellationReason: Ordered by mistake
+        "400":
+          description: Validation failed or Order status is not pending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalidOrderId:
+                  summary: Invalid order ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: id
+                        message: Invalid order ID
+                notPending:
+                  summary: Order is not pending
+                  value:
+                    success: false
+                    message: Only pending orders can be cancelled
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -990,6 +1050,14 @@ components:
             - paypal
             - bank_transfer
           example: credit_card
+
+    CancelOrderInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Reason for cancelling the order
+          example: Ordered by mistake
 
     User:
       type: object
@@ -1250,6 +1318,10 @@ components:
             - shipped
             - cancelled
           example: pending
+        cancellationReason:
+          type: string
+          nullable: true
+          example: null
         totalPrice:
           type: string
           example: "289.49"
@@ -1290,6 +1362,29 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Order"
+
+    CancelOrderResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Order cancelled successfully
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            status:
+              type: string
+              example: cancelled
+            cancellationReason:
+              type: string
+              nullable: true
+              example: Ordered by mistake
 
   responses:
     ValidationError:

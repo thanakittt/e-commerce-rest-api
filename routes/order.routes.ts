@@ -1,9 +1,12 @@
 import { Router } from "express";
-import { getOrdersByUserId } from "../controllers/order.controller";
+import {
+  cancelOrder,
+  getOrderById,
+  getOrdersByUserId,
+} from "../controllers/order.controller";
 import { authenticate } from "../middlewares/auth.middleware";
-import { getOrderById } from "../controllers/order.controller";
 import { validate } from "../middlewares/validate.middleware";
-import { getOrderByIdSchema } from "../schemas/order.schema";
+import { cancelOrderSchema, getOrderByIdSchema } from "../schemas/order.schema";
 
 const orderRouter = Router();
 
@@ -13,6 +16,13 @@ orderRouter.get(
   authenticate,
   validate(getOrderByIdSchema),
   getOrderById,
+);
+
+orderRouter.patch(
+  "/:id/cancel",
+  authenticate,
+  validate(cancelOrderSchema),
+  cancelOrder,
 );
 
 export default orderRouter;

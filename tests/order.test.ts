@@ -25,6 +25,7 @@ interface TestOrder {
   shippingAddress: string;
   paymentMethod: "credit_card" | "paypal" | "bank_transfer";
   orderDate: Date;
+  cancellationReason: string | null;
 }
 
 interface TestOrderItem {
@@ -107,6 +108,7 @@ const insertTestOrder = async (
     shippingAddress: string;
     paymentMethod: "credit_card" | "paypal" | "bank_transfer";
     orderDate: Date;
+    cancellationReason: string | null;
   }> = {},
 ): Promise<TestOrder> => {
   const payload: Record<string, unknown> = {
@@ -114,13 +116,14 @@ const insertTestOrder = async (
     status: overrides.status ?? "pending",
     shipping_address: overrides.shippingAddress ?? "123 Main St",
     payment_method: overrides.paymentMethod ?? "credit_card",
+    cancellation_reason: overrides.cancellationReason ?? null,
   };
   if (overrides.orderDate) {
     payload.order_date = overrides.orderDate;
   }
   const [order] = await sql<[TestOrder]>`
     INSERT INTO orders ${sql(payload)}
-    RETURNING id, user_id as "userId", status, shipping_address as "shippingAddress", payment_method as "paymentMethod", order_date as "orderDate"
+    RETURNING id, user_id as "userId", status, shipping_address as "shippingAddress", payment_method as "paymentMethod", order_date as "orderDate", cancellation_reason as "cancellationReason"
   `;
   return order;
 };
@@ -158,6 +161,23 @@ const sendGetOrderByIdRequest = async (
   if (!tokenOrHeader) return req;
   const headerValue = rawHeader ? tokenOrHeader : `Bearer ${tokenOrHeader}`;
   return req.set("Authorization", headerValue);
+};
+
+const sendCancelOrderRequest = async (
+  id: string | number,
+  payload?: Record<string, unknown>,
+  tokenOrHeader?: string,
+  rawHeader = false,
+) => {
+  const req = request(app).patch(`/api/orders/${id}/cancel`);
+  if (tokenOrHeader) {
+    const headerValue = rawHeader ? tokenOrHeader : `Bearer ${tokenOrHeader}`;
+    req.set("Authorization", headerValue);
+  }
+  if (payload !== undefined) {
+    req.send(payload);
+  }
+  return req;
 };
 
 const mockDatabaseError = () => {
@@ -781,18 +801,8 @@ describe("GET /api/orders/{id}", () => {
       });
 
       // Insert product 2 item first, then product 1 item
-      await insertTestOrderItem(
-        order.id,
-        product2.id,
-        1,
-        product2.price,
-      );
-      await insertTestOrderItem(
-        order.id,
-        product1.id,
-        1,
-        product1.price,
-      );
+      await insertTestOrderItem(order.id, product2.id, 1, product2.price);
+      await insertTestOrderItem(order.id, product1.id, 1, product1.price);
 
       // Act
       const res = await sendGetOrderByIdRequest(order.id, token);
@@ -960,6 +970,420 @@ describe("GET /api/orders/{id}", () => {
 
       // Act
       const res = await sendGetOrderByIdRequest(1, token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("PATCH /api/orders/{id}/cancel", () => {
+  describe("Success (200 OK)", () => {
+    it("should return 200 and cancel order when user requests to cancel their pending order with reason", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const order = await insertTestOrder(user);
+      const payload = {
+        reason: "Changed my mind",
+      };
+
+      // Act
+      const res = await sendCancelOrderRequest(order.id, payload, token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order cancelled successfully",
+        data: {
+          id: order.id,
+          status: "cancelled",
+          cancellationReason: payload.reason,
+        },
+      });
+
+      const [dbOrder] = await sql<
+        [{ status: string; cancellation_reason: string | null }]
+      >`
+        SELECT status, cancellation_reason FROM orders WHERE id = ${order.id}
+      `;
+      expect(dbOrder.status).toBe("cancelled");
+      expect(dbOrder.cancellation_reason).toBe(payload.reason);
+    });
+
+    it("should return 200 and set cancellationReason to null when user cancels without reason", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const order = await insertTestOrder(user);
+
+      // Act
+      const res = await sendCancelOrderRequest(order.id, {}, token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order cancelled successfully",
+        data: {
+          id: order.id,
+          status: "cancelled",
+          cancellationReason: null,
+        },
+      });
+
+      const [dbOrder] = await sql<
+        [{ status: string; cancellation_reason: string | null }]
+      >`
+        SELECT status, cancellation_reason FROM orders WHERE id = ${order.id}
+      `;
+      expect(dbOrder.status).toBe("cancelled");
+      expect(dbOrder.cancellation_reason).toBeNull();
+    });
+
+    it("should return 200 and set cancellationReason to null when user cancels with explicit null reason", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const order = await insertTestOrder(user);
+
+      // Act
+      const res = await sendCancelOrderRequest(
+        order.id,
+        { reason: null },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order cancelled successfully",
+        data: {
+          id: order.id,
+          status: "cancelled",
+          cancellationReason: null,
+        },
+      });
+    });
+
+    it("should return 200 when admin requests to cancel another user's pending order", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const token = generateToken(admin);
+      const anotherUser = await insertTestUser({ name: "Another User" });
+      const anotherOrder = await insertTestOrder(anotherUser);
+      const payload = {
+        reason: "Admin cancelled per customer request",
+      };
+
+      // Act
+      const res = await sendCancelOrderRequest(anotherOrder.id, payload, token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order cancelled successfully",
+        data: {
+          id: anotherOrder.id,
+          status: "cancelled",
+          cancellationReason: payload.reason,
+        },
+      });
+    });
+  });
+
+  describe("Business Rule Validation (400 Bad Request)", () => {
+    const nonPendingStatuses: Array<"paid" | "shipped" | "cancelled"> = [
+      "paid",
+      "shipped",
+      "cancelled",
+    ];
+
+    it.each(nonPendingStatuses)(
+      "should return 400 when trying to cancel order with status '%s'",
+      async (status) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+        const order = await insertTestOrder(user, {
+          status,
+        });
+
+        // Act
+        const res = await sendCancelOrderRequest(
+          order.id,
+          { reason: "Changed my mind" },
+          token,
+        );
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Only pending orders can be cancelled",
+        });
+
+        const [dbOrder] = await sql<[{ status: string }]>`
+          SELECT status FROM orders WHERE id = ${order.id}
+        `;
+        expect(dbOrder.status).toBe(status);
+      },
+    );
+  });
+
+  describe("Validation Errors - Params (400)", () => {
+    const idValidationCases = [
+      {
+        scenario: "id is not a number",
+        id: "abc",
+        message: "Order ID is required",
+      },
+      {
+        scenario: "id is not an integer",
+        id: "1.5",
+        message: "Order ID must be an integer",
+      },
+      {
+        scenario: "id is zero",
+        id: "0",
+        message: "Order ID must be a positive integer",
+      },
+      {
+        scenario: "id is negative",
+        id: "-1",
+        message: "Order ID must be a positive integer",
+      },
+    ];
+
+    it.each(idValidationCases)(
+      "should return 400 when $scenario",
+      async ({ id, message }) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+
+        // Act
+        const res = await sendCancelOrderRequest(
+          id,
+          { reason: "Changed my mind" },
+          token,
+        );
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "params",
+              field: "id",
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Validation Errors - Body (400)", () => {
+    const bodyValidationCases = [
+      {
+        scenario: "reason is empty string",
+        payload: { reason: "" },
+        field: "reason",
+        message: "Reason cannot be empty",
+      },
+      {
+        scenario: "reason is whitespace only",
+        payload: { reason: "   " },
+        field: "reason",
+        message: "Reason cannot be empty",
+      },
+      {
+        scenario: "reason is not a string",
+        payload: { reason: 123 },
+        field: "reason",
+        message: "Reason must be a string",
+      },
+    ];
+
+    it.each(bodyValidationCases)(
+      "should return 400 when $scenario",
+      async ({ payload, field, message }) => {
+        // Arrange
+        const user = await insertTestUser();
+        const token = generateToken(user);
+        const order = await insertTestOrder(user);
+
+        // Act
+        const res = await sendCancelOrderRequest(
+          order.id,
+          payload as Record<string, unknown>,
+          token,
+        );
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "body",
+              field,
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Authentication & Authorization (401 Unauthorized)", () => {
+    it("should return 401 when Authorization header is missing", async () => {
+      // Act
+      const res = await sendCancelOrderRequest(1, {
+        reason: "Changed my mind",
+      });
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when Authorization header does not start with Bearer", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+
+      // Act
+      const res = await sendCancelOrderRequest(
+        1,
+        { reason: "Changed my mind" },
+        `Basic ${token}`,
+        true,
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Act
+      const res = await sendCancelOrderRequest(
+        1,
+        { reason: "Changed my mind" },
+        "invalid.token.here",
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is expired", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const expiredToken = generateToken(user, "-1s");
+
+      // Act
+      const res = await sendCancelOrderRequest(
+        1,
+        { reason: "Changed my mind" },
+        expiredToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+  });
+
+  describe("Forbidden (403 Forbidden)", () => {
+    it("should return 403 when user tries to cancel another user's order", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      const anotherUser = await insertTestUser({ name: "Another User" });
+      const anotherOrder = await insertTestOrder(anotherUser);
+
+      // Act
+      const res = await sendCancelOrderRequest(
+        anotherOrder.id,
+        { reason: "Changed my mind" },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+
+      const [dbOrder] = await sql<[{ status: string }]>`
+        SELECT status FROM orders WHERE id = ${anotherOrder.id}
+      `;
+      expect(dbOrder.status).toBe("pending");
+    });
+  });
+
+  describe("Not Found (404 Not Found)", () => {
+    it("should return 404 when order does not exist", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+
+      // Act
+      const res = await sendCancelOrderRequest(
+        999999,
+        { reason: "Changed my mind" },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Not found",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+      mockDatabaseError();
+
+      // Act
+      const res = await sendCancelOrderRequest(
+        1,
+        { reason: "Changed my mind" },
+        token,
+      );
 
       // Assert
       expect(res.status).toBe(500);

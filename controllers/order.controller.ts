@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import sql from "../db";
+import type { CancelOrderInput } from "../schemas/order.schema";
 
 interface FormattedOrderItem {
   productId: number;
@@ -19,6 +20,17 @@ interface OrderDetailRow {
   items: FormattedOrderItem[];
   totalPrice: string;
   totalQuantity: number;
+}
+
+interface OrderStatusRow {
+  userId: number;
+  status: string;
+}
+
+interface CancelledOrderRow {
+  id: number;
+  status: string;
+  cancellationReason: string | null;
 }
 
 function formatOrderDetail(order: OrderDetailRow) {
@@ -142,3 +154,78 @@ export async function getOrderById(
     next(error);
   }
 }
+
+export async function cancelOrder(
+  req: Request<{ id: string }, {}, CancelOrderInput>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = req.userId!;
+    const userRole = req.userRole!;
+    const orderId = Number(req.params.id);
+    const reason = req.body.reason ?? null;
+
+    const [order] = await sql<[OrderStatusRow]>`
+      SELECT user_id as "userId", status
+      FROM orders
+      WHERE id = ${orderId}
+    `;
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    const isOwner = order.userId === userId;
+    const isAdmin = userRole === "admin";
+    const hasPermission = isOwner || isAdmin;
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    const isPending = order.status === "pending";
+    if (!isPending) {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending orders can be cancelled",
+      });
+    }
+
+    const [updatedOrder] = await sql<[CancelledOrderRow]>`
+      UPDATE orders
+      SET
+        status = 'cancelled',
+        cancellation_reason = ${reason}
+      WHERE
+        id = ${orderId}
+        AND status = 'pending'
+      RETURNING
+        id,
+        status,
+        cancellation_reason as "cancellationReason"
+    `;
+
+    if (!updatedOrder) {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending orders can be cancelled",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Order cancelled successfully",
+      data: updatedOrder,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
