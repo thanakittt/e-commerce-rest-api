@@ -796,6 +796,57 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /orders/{id}:
+    get:
+      summary: Get order details by ID
+      description: Retrieve order details by order ID. Accessible by the order owner (User) or Admin.
+      security:
+        - bearerAuth: []
+      tags:
+        - Orders
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Order fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+              example:
+                success: true
+                message: Order fetched successfully
+                data:
+                  id: 1
+                  userId: 2
+                  shippingAddress: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
+                  paymentMethod: credit_card
+                  status: pending
+                  totalPrice: 289.49
+                  totalQuantity: 2
+                  orderDate: "2026-09-19T00:00:00.000Z"
+                  items:
+                    - productId: 1
+                      name: Wireless Noise-Cancelling Headphones
+                      quantity: 1
+                      unitPrice: 199.99
+                      subtotal: 199.99
+                    - productId: 2
+                      name: Mechanical Gaming Keyboard
+                      quantity: 1
+                      unitPrice: 89.50
+                      subtotal: 89.50
+        "400":
+          $ref: "#/components/responses/InvalidOrderId"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1329,6 +1380,20 @@ components:
               - location: params
                 field: id
                 message: Invalid cart ID
+
+    InvalidOrderId:
+      description: Invalid order ID
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrorResponse"
+          example:
+            success: false
+            message: Validation failed
+            errors:
+              - location: params
+                field: id
+                message: Invalid order ID
 
     InternalServerError:
       description: Internal server error

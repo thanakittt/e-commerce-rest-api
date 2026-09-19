@@ -114,3 +114,89 @@ export async function getOrdersByUserId(
     next(error);
   }
 }
+
+interface OrderDetailRow {
+  id: number;
+  userId: number;
+  orderDate: Date;
+  status: string;
+  shippingAddress: string;
+  paymentMethod: string;
+  items: FormattedOrderItem[];
+  totalPrice: string;
+  totalQuantity: number;
+}
+
+function formatOrderDetail(order: OrderDetailRow) {
+  return {
+    ...order,
+    totalPrice: parseFloat(order.totalPrice),
+  };
+}
+
+export async function getOrderById(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const orderId = Number(req.params.id);
+    const userId = req.userId!;
+    const userRole = req.userRole!;
+
+    const [orderDetail] = await sql<[OrderDetailRow]>`
+        SELECT 
+            o.id,
+            o.user_id as "userId",
+            o.order_date as "orderDate",
+            o.status,
+            o.shipping_address as "shippingAddress",
+            o.payment_method as "paymentMethod",
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'productId', p.id,
+                  'name', p.name,
+                  'quantity', oi.quantity,
+                  'unitPrice', oi.unit_price,
+                  'subtotal', ROUND((oi.quantity * oi.unit_price)::numeric, 2)
+                ) ORDER BY oi.product_id ASC
+              ) FILTER (WHERE oi.product_id IS NOT NULL),
+              '[]'
+            ) as "items",
+            COALESCE(ROUND(SUM(oi.quantity * oi.unit_price)::numeric, 2), 0) as "totalPrice",
+            COALESCE(SUM(oi.quantity)::integer, 0) as "totalQuantity"
+        FROM orders o
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN products p ON oi.product_id = p.id
+        WHERE o.id = ${orderId}
+        GROUP BY o.id
+    `;
+
+    if (!orderDetail) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    const isOwner = orderDetail.userId === userId;
+    const isAdmin = userRole === "admin";
+    const hasPermission = isOwner || isAdmin;
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Order fetched successfully",
+      data: formatOrderDetail(orderDetail),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
