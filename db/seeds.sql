@@ -58,11 +58,11 @@ INSERT INTO cart_items (cart_id, product_id, quantity) VALUES
     (3, 10, 1);
 
 -- 7. Seed Orders
-INSERT INTO orders (id, user_id, status, order_date, shipping_address, payment_method) OVERRIDING SYSTEM VALUE VALUES
-    (1, 2, 'paid', NOW() - INTERVAL '10 days', '123 Sukhumvit Rd, Bangkok 10110', 'credit_card'),
-    (2, 2, 'shipped', NOW() - INTERVAL '4 days', '123 Sukhumvit Rd, Bangkok 10110', 'paypal'),
-    (3, 3, 'pending', NOW() - INTERVAL '2 days', '456 Silom Rd, Bangkok 10500', 'bank_transfer'),
-    (4, 4, 'cancelled', NOW() - INTERVAL '1 day', '789 Nimman Rd, Chiang Mai 50200', 'credit_card');
+INSERT INTO orders (id, user_id, status, order_date, shipping_address, payment_method, cancellation_reason) OVERRIDING SYSTEM VALUE VALUES
+    (1, 2, 'paid', NOW() - INTERVAL '10 days', '123 Sukhumvit Rd, Bangkok 10110', 'credit_card', NULL),
+    (2, 2, 'shipped', NOW() - INTERVAL '4 days', '123 Sukhumvit Rd, Bangkok 10110', 'paypal', NULL),
+    (3, 3, 'pending', NOW() - INTERVAL '2 days', '456 Silom Rd, Bangkok 10500', 'bank_transfer', NULL),
+    (4, 4, 'cancelled', NOW() - INTERVAL '1 day', '789 Nimman Rd, Chiang Mai 50200', 'credit_card', 'Ordered by mistake');
 
 -- 8. Seed Order Items
 INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES
