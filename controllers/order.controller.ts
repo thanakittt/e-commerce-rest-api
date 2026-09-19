@@ -17,9 +17,9 @@ interface OrderItemRow {
 interface FormattedOrderItem {
   productId: number;
   name: string;
-  unitPrice: number;
+  unitPrice: string;
   quantity: number;
-  subtotal: number;
+  subtotal: string;
 }
 
 type FormattedOrder = Pick<
@@ -28,7 +28,7 @@ type FormattedOrder = Pick<
 > & {
   userId: number;
   orderDate: string;
-  totalPrice: number;
+  totalPrice: string;
   totalQuantity: number;
   items: FormattedOrderItem[];
 };
@@ -45,10 +45,10 @@ function formatOrders(
 
     const item: FormattedOrderItem = {
       name: order.name,
-      unitPrice,
+      unitPrice: unitPrice.toFixed(2),
       quantity: order.quantity,
       productId: order.productId,
-      subtotal,
+      subtotal: subtotal.toFixed(2),
     };
 
     const existingOrder = map.get(order.id);
@@ -60,7 +60,7 @@ function formatOrders(
         paymentMethod: order.paymentMethod,
         shippingAddress: order.shippingAddress,
         status: order.status,
-        totalPrice: subtotal,
+        totalPrice: subtotal.toFixed(2),
         totalQuantity: order.quantity,
         items: [item],
       });
@@ -68,9 +68,8 @@ function formatOrders(
       continue;
     }
 
-    existingOrder.totalPrice = Number(
-      (existingOrder.totalPrice + subtotal).toFixed(2),
-    );
+    const currentTotal = parseFloat(existingOrder.totalPrice) + subtotal;
+    existingOrder.totalPrice = currentTotal.toFixed(2);
     existingOrder.totalQuantity += order.quantity;
     existingOrder.items.push(item);
   }
@@ -130,7 +129,7 @@ interface OrderDetailRow {
 function formatOrderDetail(order: OrderDetailRow) {
   return {
     ...order,
-    totalPrice: parseFloat(order.totalPrice),
+    totalPrice: Number(order.totalPrice).toFixed(2),
   };
 }
 
@@ -158,8 +157,8 @@ export async function getOrderById(
                   'productId', p.id,
                   'name', p.name,
                   'quantity', oi.quantity,
-                  'unitPrice', oi.unit_price,
-                  'subtotal', ROUND((oi.quantity * oi.unit_price)::numeric, 2)
+                  'unitPrice', oi.unit_price::text,
+                  'subtotal', ROUND((oi.quantity * oi.unit_price)::numeric, 2)::text
                 ) ORDER BY oi.product_id ASC
               ) FILTER (WHERE oi.product_id IS NOT NULL),
               '[]'

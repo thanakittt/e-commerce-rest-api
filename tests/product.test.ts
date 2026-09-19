@@ -44,7 +44,7 @@ interface TestProduct {
   id: number;
   name: string;
   description: string | null;
-  price: number;
+  price: string;
   stock: number;
   categoryId: number | null;
 }
@@ -98,7 +98,7 @@ const insertTestProduct = async (
     id: product.id,
     name: product.name,
     description: product.description,
-    price: parseFloat(product.price),
+    price: Number(product.price).toFixed(2),
     stock: product.stock,
     categoryId: product.category_id,
   };
@@ -168,6 +168,7 @@ describe("POST /api/products", () => {
         data: {
           id: 1,
           ...productData,
+          price: "100.00",
         },
       });
     });
@@ -193,7 +194,7 @@ describe("POST /api/products", () => {
           id: 1,
           name: "Test Product Without Optionals",
           description: null,
-          price: 100.0,
+          price: "100.00",
           stock: 10,
           categoryId: null,
         },
@@ -220,6 +221,7 @@ describe("POST /api/products", () => {
         data: {
           id: 1,
           ...productData,
+          price: "100.00",
         },
       });
     });
@@ -247,6 +249,7 @@ describe("POST /api/products", () => {
         data: {
           id: 1,
           ...productData,
+          price: "99.99",
         },
       });
     });
@@ -274,6 +277,7 @@ describe("POST /api/products", () => {
         data: {
           id: 1,
           ...productData,
+          price: "50.00",
         },
       });
     });
@@ -546,6 +550,7 @@ describe("PUT /api/products/:id", () => {
         data: {
           id: existingProduct.id,
           ...updatePayload,
+          price: "150.75",
         },
       });
     });
@@ -579,7 +584,7 @@ describe("PUT /api/products/:id", () => {
           id: existingProduct.id,
           name: "Updated Product Without Optionals",
           description: null,
-          price: 200.0,
+          price: "200.00",
           stock: 15,
           categoryId: null,
         },
@@ -616,6 +621,7 @@ describe("PUT /api/products/:id", () => {
         data: {
           id: existingProduct.id,
           ...updatePayload,
+          price: "75.00",
         },
       });
     });
@@ -650,6 +656,7 @@ describe("PUT /api/products/:id", () => {
         data: {
           id: existingProduct.id,
           ...updatePayload,
+          price: "12.99",
         },
       });
     });
@@ -684,6 +691,7 @@ describe("PUT /api/products/:id", () => {
         data: {
           id: existingProduct.id,
           ...updatePayload,
+          price: "50.00",
         },
       });
     });

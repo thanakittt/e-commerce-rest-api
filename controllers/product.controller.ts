@@ -18,7 +18,7 @@ interface ProductResponse {
   id: number;
   name: string;
   description: string | null;
-  price: number;
+  price: string;
   stock: number;
   categoryId: number | null;
 }
@@ -28,7 +28,7 @@ function formatProductResponse(product: ProductRow): ProductResponse {
     id: product.id,
     name: product.name,
     description: product.description,
-    price: parseFloat(product.price),
+    price: Number(product.price).toFixed(2),
     stock: product.stock,
     categoryId: product.category_id,
   };

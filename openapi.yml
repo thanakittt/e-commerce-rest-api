@@ -434,10 +434,10 @@ paths:
                   items:
                     - productId: 1
                       name: Product 1
-                      price: 100
+                      price: "100.00"
                       quantity: 2
-                      subtotal: 200
-                  totalPrice: 200
+                      subtotal: "200.00"
+                  totalPrice: "200.00"
                   totalQuantity: 2
         "400":
           $ref: "#/components/responses/InvalidCartId"
@@ -524,10 +524,10 @@ paths:
                   items:
                     - productId: 1
                       name: Product 1
-                      price: 100
+                      price: "100.00"
                       quantity: 3
-                      subtotal: 300
-                  totalPrice: 300
+                      subtotal: "300.00"
+                  totalPrice: "300.00"
                   totalQuantity: 3
         "400":
           description: Validation failed
@@ -679,20 +679,20 @@ paths:
                   shippingAddress: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
                   paymentMethod: credit_card
                   status: pending
-                  totalPrice: 289.49
+                  totalPrice: "289.49"
                   totalQuantity: 2
                   orderDate: "2026-09-19T00:00:00.000Z"
                   items:
                     - productId: 1
                       name: Wireless Noise-Cancelling Headphones
                       quantity: 1
-                      unitPrice: 199.99
-                      subtotal: 199.99
+                      unitPrice: "199.99"
+                      subtotal: "199.99"
                     - productId: 2
                       name: Mechanical Gaming Keyboard
                       quantity: 1
-                      unitPrice: 89.50
-                      subtotal: 89.50
+                      unitPrice: "89.50"
+                      subtotal: "89.50"
         "400":
           description: Validation failed or Cart is empty / Insufficient stock
           content:
@@ -777,20 +777,20 @@ paths:
                     shippingAddress: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
                     paymentMethod: credit_card
                     status: pending
-                    totalPrice: 289.49
+                    totalPrice: "289.49"
                     totalQuantity: 2
                     orderDate: "2026-09-19T00:00:00.000Z"
                     items:
                       - productId: 1
                         name: Wireless Noise-Cancelling Headphones
                         quantity: 1
-                        unitPrice: 199.99
-                        subtotal: 199.99
+                        unitPrice: "199.99"
+                        subtotal: "199.99"
                       - productId: 2
                         name: Mechanical Gaming Keyboard
                         quantity: 1
-                        unitPrice: 89.50
-                        subtotal: 89.50
+                        unitPrice: "89.50"
+                        subtotal: "89.50"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -822,20 +822,20 @@ paths:
                   shippingAddress: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
                   paymentMethod: credit_card
                   status: pending
-                  totalPrice: 289.49
+                  totalPrice: "289.49"
                   totalQuantity: 2
                   orderDate: "2026-09-19T00:00:00.000Z"
                   items:
                     - productId: 1
                       name: Wireless Noise-Cancelling Headphones
                       quantity: 1
-                      unitPrice: 199.99
-                      subtotal: 199.99
+                      unitPrice: "199.99"
+                      subtotal: "199.99"
                     - productId: 2
                       name: Mechanical Gaming Keyboard
                       quantity: 1
-                      unitPrice: 89.50
-                      subtotal: 89.50
+                      unitPrice: "89.50"
+                      subtotal: "89.50"
         "400":
           $ref: "#/components/responses/InvalidOrderId"
         "401":
@@ -1025,8 +1025,8 @@ components:
           type: string
           example: Product 1
         price:
-          type: number
-          example: 100
+          type: string
+          example: "100.00"
         stock:
           type: integer
           example: 10
@@ -1049,15 +1049,15 @@ components:
           type: string
           example: Product 1
         price:
-          type: number
-          example: 100
+          type: string
+          example: "100.00"
         quantity:
           type: integer
           minimum: 1
           example: 2
         subtotal:
-          type: number
-          example: 200
+          type: string
+          example: "200.00"
 
     Cart:
       type: object
@@ -1077,8 +1077,8 @@ components:
           type: integer
           example: 2
         totalPrice:
-          type: number
-          example: 200
+          type: string
+          example: "200.00"
 
     ErrorResponse:
       type: object
@@ -1221,11 +1221,11 @@ components:
           minimum: 1
           example: 1
         unitPrice:
-          type: number
-          example: 199.99
+          type: string
+          example: "199.99"
         subtotal:
-          type: number
-          example: 199.99
+          type: string
+          example: "199.99"
 
     Order:
       type: object
@@ -1251,8 +1251,8 @@ components:
             - cancelled
           example: pending
         totalPrice:
-          type: number
-          example: 289.49
+          type: string
+          example: "289.49"
         totalQuantity:
           type: integer
           example: 2

@@ -182,7 +182,7 @@ const toOrderResponse = (
     shippingAddress,
     paymentMethod,
     orderDate: orderDate.toISOString(),
-    totalPrice,
+    totalPrice: totalPrice.toFixed(2),
     totalQuantity,
   };
 };
@@ -198,8 +198,8 @@ const toOrderItemResponse = (
     productId,
     name,
     quantity,
-    unitPrice: parseFloat(unitPrice),
-    subtotal,
+    unitPrice: parseFloat(unitPrice).toFixed(2),
+    subtotal: subtotal.toFixed(2),
   };
 };
 
@@ -327,23 +327,23 @@ describe("GET /api/orders", () => {
             shippingAddress: order2.shippingAddress,
             paymentMethod: order2.paymentMethod,
             status: order2.status,
-            totalPrice: totalPrice2,
+            totalPrice: totalPrice2.toFixed(2),
             totalQuantity: totalQuantity2,
             orderDate: order2.orderDate.toISOString(),
             items: [
               {
                 productId: productA.id,
                 name: productA.name,
-                unitPrice: productA.price,
+                unitPrice: productA.price.toFixed(2),
                 quantity: orderItem2A.quantity,
-                subtotal: subtotal2A,
+                subtotal: subtotal2A.toFixed(2),
               },
               {
                 productId: productB.id,
                 name: productB.name,
-                unitPrice: productB.price,
+                unitPrice: productB.price.toFixed(2),
                 quantity: orderItem2B.quantity,
-                subtotal: subtotal2B,
+                subtotal: subtotal2B.toFixed(2),
               },
             ],
           },
@@ -353,23 +353,23 @@ describe("GET /api/orders", () => {
             shippingAddress: order1.shippingAddress,
             paymentMethod: order1.paymentMethod,
             status: order1.status,
-            totalPrice: totalPrice1,
+            totalPrice: totalPrice1.toFixed(2),
             totalQuantity: totalQuantity1,
             orderDate: order1.orderDate.toISOString(),
             items: [
               {
                 productId: productA.id,
                 name: productA.name,
-                unitPrice: productA.price,
+                unitPrice: productA.price.toFixed(2),
                 quantity: orderItem1A.quantity,
-                subtotal: subtotal1A,
+                subtotal: subtotal1A.toFixed(2),
               },
               {
                 productId: productB.id,
                 name: productB.name,
-                unitPrice: productB.price,
+                unitPrice: productB.price.toFixed(2),
                 quantity: orderItem1B.quantity,
-                subtotal: subtotal1B,
+                subtotal: subtotal1B.toFixed(2),
               },
             ],
           },
@@ -493,12 +493,12 @@ describe("GET /api/orders", () => {
       // Assert
       expect(res.status).toBe(200);
       const orderData = res.body.data[0];
-      expect(orderData.totalPrice).toBe(79.87);
+      expect(orderData.totalPrice).toBe("79.87");
       expect(orderData.totalQuantity).toBe(5);
-      expect(orderData.items[0].subtotal).toBe(59.97);
-      expect(orderData.items[0].unitPrice).toBe(19.99);
-      expect(orderData.items[1].subtotal).toBe(19.9);
-      expect(orderData.items[1].unitPrice).toBe(9.95);
+      expect(orderData.items[0].subtotal).toBe("59.97");
+      expect(orderData.items[0].unitPrice).toBe("19.99");
+      expect(orderData.items[1].subtotal).toBe("19.90");
+      expect(orderData.items[1].unitPrice).toBe("9.95");
     });
 
     it("should correctly handle various order statuses and payment methods", async () => {

@@ -31,16 +31,16 @@ interface CartItemRow {
 interface CartItemResponse {
   productId: number;
   name: string;
-  price: number;
+  price: string;
   quantity: number;
-  subtotal: number;
+  subtotal: string;
 }
 
 interface CartResponse {
   id: number;
   userId: number;
   items: CartItemResponse[];
-  totalPrice: number;
+  totalPrice: string;
   totalQuantity: number;
 }
 
@@ -104,9 +104,9 @@ function formatCartResponse(
     return {
       productId: item.id,
       name: item.name,
-      price: parseFloat(item.price),
+      price: Number(item.price).toFixed(2),
       quantity: item.quantity,
-      subtotal,
+      subtotal: subtotal.toFixed(2),
     };
   });
 
@@ -114,7 +114,7 @@ function formatCartResponse(
     id: cartId,
     userId,
     items,
-    totalPrice,
+    totalPrice: totalPrice.toFixed(2),
     totalQuantity,
   };
 }
@@ -474,14 +474,14 @@ function formatCheckoutResponse(
     paymentMethod,
     orderDate: order.order_date,
     status: order.status,
-    totalPrice,
+    totalPrice: totalPrice.toFixed(2),
     totalQuantity,
     items: cartItems.map((item) => ({
       productId: item.product_id,
       name: item.name,
       quantity: item.quantity,
-      unitPrice: Number(item.price),
-      subtotal: item.quantity * Number(item.price),
+      unitPrice: Number(item.price).toFixed(2),
+      subtotal: (item.quantity * Number(item.price)).toFixed(2),
     })),
   };
 }

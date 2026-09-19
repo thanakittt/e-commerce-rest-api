@@ -121,19 +121,19 @@ const setupTestCartWithItems = async (user: Pick<TestUser, "id">) => {
       {
         productId: productA.id,
         name: productA.name,
-        price: productA.price,
+        price: productA.price.toFixed(2),
         quantity: cartItemA.quantity,
-        subtotal: subtotalA,
+        subtotal: subtotalA.toFixed(2),
       },
       {
         productId: productB.id,
         name: productB.name,
-        price: productB.price,
+        price: productB.price.toFixed(2),
         quantity: cartItemB.quantity,
-        subtotal: subtotalB,
+        subtotal: subtotalB.toFixed(2),
       },
     ],
-    totalPrice,
+    totalPrice: totalPrice.toFixed(2),
     totalQuantity,
   };
 
@@ -258,12 +258,12 @@ describe("POST /api/carts", () => {
             {
               ...cartData,
               name: product.name,
-              price: product.price,
-              subtotal: product.price * cartData.quantity,
+              price: product.price.toFixed(2),
+              subtotal: (product.price * cartData.quantity).toFixed(2),
             },
           ],
           totalQuantity: cartData.quantity,
-          totalPrice: product.price * cartData.quantity,
+          totalPrice: (product.price * cartData.quantity).toFixed(2),
         },
       });
     });
@@ -295,12 +295,12 @@ describe("POST /api/carts", () => {
             {
               ...cartData,
               name: product.name,
-              price: product.price,
-              subtotal: product.price * cartData.quantity,
+              price: product.price.toFixed(2),
+              subtotal: (product.price * cartData.quantity).toFixed(2),
             },
           ],
           totalQuantity: cartData.quantity,
-          totalPrice: product.price * cartData.quantity,
+          totalPrice: (product.price * cartData.quantity).toFixed(2),
         },
       });
     });
@@ -338,12 +338,12 @@ describe("POST /api/carts", () => {
               productId: existingProduct.id,
               quantity: expectedQuantity,
               name: existingProduct.name,
-              price: existingProduct.price,
-              subtotal: existingProduct.price * expectedQuantity,
+              price: existingProduct.price.toFixed(2),
+              subtotal: (existingProduct.price * expectedQuantity).toFixed(2),
             },
           ],
           totalQuantity: expectedQuantity,
-          totalPrice: existingProduct.price * expectedQuantity,
+          totalPrice: (existingProduct.price * expectedQuantity).toFixed(2),
         },
       });
     });
@@ -394,19 +394,19 @@ describe("POST /api/carts", () => {
               productId: existingProductA.id,
               quantity: existingQuantity,
               name: existingProductA.name,
-              price: existingProductA.price,
-              subtotal: subtotalA,
+              price: existingProductA.price.toFixed(2),
+              subtotal: subtotalA.toFixed(2),
             },
             {
               productId: existingProductB.id,
               quantity: cartData.quantity,
               name: existingProductB.name,
-              price: existingProductB.price,
-              subtotal: subtotalB,
+              price: existingProductB.price.toFixed(2),
+              subtotal: subtotalB.toFixed(2),
             },
           ],
           totalQuantity: expectedQuantity,
-          totalPrice: subtotalA + subtotalB,
+          totalPrice: (subtotalA + subtotalB).toFixed(2),
         },
       });
     });
@@ -470,9 +470,9 @@ describe("POST /api/carts", () => {
 
       // Assert
       expect(res.status).toBe(200);
-      expect(res.body.data.items[0].price).toBe(19.99);
-      expect(res.body.data.items[0].subtotal).toBe(59.97);
-      expect(res.body.data.totalPrice).toBe(59.97);
+      expect(res.body.data.items[0].price).toBe("19.99");
+      expect(res.body.data.items[0].subtotal).toBe("59.97");
+      expect(res.body.data.totalPrice).toBe("59.97");
     });
   });
 
@@ -920,7 +920,7 @@ describe("GET /api/carts/:id", () => {
           id: cart.id,
           userId: user.id,
           items: [],
-          totalPrice: 0,
+          totalPrice: "0.00",
           totalQuantity: 0,
         },
       });
@@ -1606,12 +1606,12 @@ describe("PUT /api/carts/:cartId/items/:productId", () => {
             {
               productId: product.id,
               name: product.name,
-              price: product.price,
+              price: product.price.toFixed(2),
               quantity: newQuantity,
-              subtotal,
+              subtotal: subtotal.toFixed(2),
             },
           ],
-          totalPrice: subtotal,
+          totalPrice: subtotal.toFixed(2),
           totalQuantity: newQuantity,
         },
       });
@@ -1652,12 +1652,12 @@ describe("PUT /api/carts/:cartId/items/:productId", () => {
             {
               productId: product.id,
               name: product.name,
-              price: product.price,
+              price: product.price.toFixed(2),
               quantity: newQuantity,
-              subtotal,
+              subtotal: subtotal.toFixed(2),
             },
           ],
-          totalPrice: subtotal,
+          totalPrice: subtotal.toFixed(2),
           totalQuantity: newQuantity,
         },
       });
@@ -1701,19 +1701,19 @@ describe("PUT /api/carts/:cartId/items/:productId", () => {
             {
               productId: productAId,
               name: "Product A",
-              price: 100,
+              price: "100.00",
               quantity: updatedQtyA,
-              subtotal: subtotalA,
+              subtotal: subtotalA.toFixed(2),
             },
             {
               productId: productBId,
               name: "Product B",
-              price: 200,
+              price: "200.00",
               quantity: originalQtyB,
-              subtotal: subtotalB,
+              subtotal: subtotalB.toFixed(2),
             },
           ],
-          totalPrice,
+          totalPrice: totalPrice.toFixed(2),
           totalQuantity,
         },
       });
@@ -2159,7 +2159,7 @@ describe("POST /api/carts/:id/checkout", () => {
           shippingAddress: body.shippingAddress,
           paymentMethod: body.paymentMethod,
           status: "pending",
-          totalPrice: subtotal,
+          totalPrice: subtotal.toFixed(2),
           totalQuantity: cartItem.quantity,
           orderDate: expect.any(String),
           items: [
@@ -2167,8 +2167,8 @@ describe("POST /api/carts/:id/checkout", () => {
               productId: product.id,
               name: product.name,
               quantity: cartItem.quantity,
-              unitPrice: product.price,
-              subtotal,
+              unitPrice: product.price.toFixed(2),
+              subtotal: subtotal.toFixed(2),
             },
           ],
         },
@@ -2262,7 +2262,7 @@ describe("POST /api/carts/:id/checkout", () => {
           shippingAddress: body.shippingAddress,
           paymentMethod: body.paymentMethod,
           status: "pending",
-          totalPrice,
+          totalPrice: totalPrice.toFixed(2),
           totalQuantity,
           orderDate: expect.any(String),
           items: [
@@ -2270,15 +2270,15 @@ describe("POST /api/carts/:id/checkout", () => {
               productId: productA.id,
               name: productA.name,
               quantity: cartItemA.quantity,
-              unitPrice: productA.price,
-              subtotal: subtotalA,
+              unitPrice: productA.price.toFixed(2),
+              subtotal: subtotalA.toFixed(2),
             },
             {
               productId: productB.id,
               name: productB.name,
               quantity: cartItemB.quantity,
-              unitPrice: productB.price,
-              subtotal: subtotalB,
+              unitPrice: productB.price.toFixed(2),
+              subtotal: subtotalB.toFixed(2),
             },
           ],
         },
