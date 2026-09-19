@@ -4,6 +4,7 @@ import { errorHandler } from "./middlewares/error.middleware";
 import userRoutes from "./routes/user.routes";
 import productRouter from "./routes/product.routes";
 import cartRouter from "./routes/cart.routes";
+import orderRouter from "./routes/order.routes";
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRouter);
 app.use("/api/carts", cartRouter);
+app.use("/api/orders", orderRouter);
 
 app.get("/", (_req, res) => {
   res.json({
