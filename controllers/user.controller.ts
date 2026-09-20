@@ -159,3 +159,68 @@ export async function getUserProfile(
     next(error);
   }
 }
+
+export async function updateUserProfile(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = Number(req.userId);
+    const { name, email, phone } = req.body;
+
+    const [user] = await sql<
+      [
+        {
+          id: number;
+          name: string;
+          email: string;
+          phone: string | null;
+          role: string;
+        },
+      ]
+    >`
+      UPDATE users 
+      SET name = ${name}, email = ${email}, phone = ${phone ?? null} 
+      WHERE id = ${userId} 
+      RETURNING id, name, email, phone, role;
+    `;
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User profile updated successfully",
+      data: user,
+    });
+  } catch (error) {
+    if (error instanceof pg.PostgresError && error.code === "23505") {
+      const constraint = (
+        error.constraint_name ??
+        error.detail ??
+        ""
+      ).toLowerCase();
+
+      if (constraint.includes("email")) {
+        return res.status(409).json({
+          success: false,
+          message: "Email already exists",
+        });
+      }
+
+      if (constraint.includes("phone")) {
+        return res.status(409).json({
+          success: false,
+          message: "Phone already exists",
+        });
+      }
+    }
+
+    next(error);
+  }
+}

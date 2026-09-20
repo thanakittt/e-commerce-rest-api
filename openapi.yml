@@ -106,6 +106,66 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+    put:
+      summary: Update current user profile
+      description: Update profile of the currently logged-in user
+      security:
+        - bearerAuth: []
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserInput"
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalidBody:
+                  summary: Invalid body field
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: email
+                        message: Invalid email address
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflict - Duplicate email or phone number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                emailConflict:
+                  summary: Email conflict
+                  value:
+                    success: false
+                    message: Email already exists
+                phoneConflict:
+                  summary: Phone conflict
+                  value:
+                    success: false
+                    message: Phone already exists
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /users/{id}:
     get:
       summary: Get a user by ID

@@ -2,7 +2,11 @@ import { Router } from "express";
 import * as UserController from "../controllers/user.controller";
 import { authenticate, authorizeRoles } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { updateUserSchema, userIdSchema } from "../schemas/auth.schema";
+import {
+  updateUserProfileSchema,
+  updateUserSchema,
+  userIdSchema,
+} from "../schemas/auth.schema";
 
 const userRoutes = Router();
 
@@ -14,6 +18,12 @@ userRoutes.get(
 );
 
 userRoutes.get("/profile", authenticate, UserController.getUserProfile);
+userRoutes.put(
+  "/profile",
+  authenticate,
+  validate(updateUserProfileSchema),
+  UserController.updateUserProfile,
+);
 
 userRoutes.get(
   "/:id",

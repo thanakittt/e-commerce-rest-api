@@ -40,7 +40,18 @@ export const updateUserSchema = z.object({
     .strict(),
 });
 
+export const updateUserProfileSchema = z.object({
+  body: userBaseSchema
+    .pick({
+      name: true,
+      email: true,
+      phone: true,
+    })
+    .strict(),
+});
+
 export type UserIdInput = z.input<typeof userIdSchema>["params"];
 export type RegisterInput = z.infer<typeof registerSchema>["body"];
 export type LoginInput = z.infer<typeof loginSchema>["body"];
 export type UpdateUserInput = z.input<typeof updateUserSchema>;
+export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>["body"];
