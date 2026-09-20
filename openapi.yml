@@ -327,6 +327,97 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /categories:
+    get:
+      summary: Get all categories
+      description: Retrieve a list of all categories. Public access.
+      tags:
+        - Categories
+      responses:
+        "200":
+          description: Categories fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+              example:
+                success: true
+                message: Categories fetched successfully
+                data:
+                  - id: 1
+                    name: Electronics
+                  - id: 2
+                    name: Clothing
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Create a new category (Admin)
+      description: Add a new category. Accessible only by Admin.
+      security:
+        - bearerAuth: []
+      tags:
+        - Categories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "201":
+          description: Category created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryResponse"
+              example:
+                success: true
+                message: Category created successfully
+                data:
+                  id: 1
+                  name: Electronics
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                missingName:
+                  summary: Missing name
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: name
+                        message: Name is required
+                emptyName:
+                  summary: Empty name
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: name
+                        message: Name cannot be empty
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Conflict - Category already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: Category already exists
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /products:
     get:
       summary: Get all products
@@ -1290,6 +1381,15 @@ components:
           description: Target role for the user
           example: admin
 
+    CategoryInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: Electronics
+
     ProductInput:
       type: object
       required:
@@ -1392,6 +1492,16 @@ components:
             - user
             - admin
           example: user
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Electronics
 
     Product:
       type: object
@@ -1555,6 +1665,32 @@ components:
             role:
               type: string
               example: admin
+
+    CategoryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Category created successfully
+        data:
+          $ref: "#/components/schemas/Category"
+
+    CategoriesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Categories fetched successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
 
     ProductResponse:
       type: object
