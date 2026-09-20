@@ -264,6 +264,69 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /users/{userId}/role:
+    patch:
+      summary: Update user role (Admin)
+      description: Change user role/permission. Accessible only by Admin.
+      security:
+        - bearerAuth: []
+      tags:
+        - Users
+      parameters:
+        - $ref: "#/components/parameters/UserIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRoleInput"
+      responses:
+        "200":
+          description: User role updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateUserRoleResponse"
+              example:
+                success: true
+                message: User role updated successfully
+                data:
+                  id: 1
+                  role: admin
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalidUserId:
+                  summary: Invalid user ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: userId
+                        message: User ID must be a positive integer
+                invalidRole:
+                  summary: Invalid role value
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: role
+                        message: "Invalid role. Allowed values: user, admin"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /products:
     get:
       summary: Get all products
@@ -1127,6 +1190,16 @@ components:
         minimum: 1
       example: 1
 
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      description: ID of the user whose role is being updated
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+
   schemas:
     RegisterInput:
       type: object
@@ -1183,6 +1256,19 @@ components:
         phone:
           type: string
           example: "0812345678"
+
+    UpdateUserRoleInput:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+          description: Target role for the user
+          example: admin
 
     ProductInput:
       type: object
@@ -1430,6 +1516,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/User"
+
+    UpdateUserRoleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: User role updated successfully
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            role:
+              type: string
+              example: admin
 
     ProductResponse:
       type: object

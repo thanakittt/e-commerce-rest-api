@@ -4,6 +4,7 @@ import { authenticate, authorizeRoles } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   updateUserProfileSchema,
+  updateUserRoleSchema,
   updateUserSchema,
   userIdSchema,
 } from "../schemas/auth.schema";
@@ -39,6 +40,14 @@ userRoutes.put(
   authorizeRoles(["admin", "user"]),
   validate(updateUserSchema),
   UserController.updateUserById,
+);
+
+userRoutes.patch(
+  "/:userId/role",
+  authenticate,
+  authorizeRoles(["admin"]),
+  validate(updateUserRoleSchema),
+  UserController.updateUserRole,
 );
 
 export default userRoutes;

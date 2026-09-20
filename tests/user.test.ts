@@ -88,6 +88,15 @@ const sendUpdateUserProfileRequest = (
   return token ? req.set("Authorization", `Bearer ${token}`) : req;
 };
 
+const sendUpdateUserRoleRequest = (
+  userId: number | string,
+  body: Record<string, unknown>,
+  token?: string,
+) => {
+  const req = request(app).patch(`/api/users/${userId}/role`).send(body);
+  return token ? req.set("Authorization", `Bearer ${token}`) : req;
+};
+
 describe("Users API", () => {
   beforeEach(async () => {
     await sql`TRUNCATE TABLE users RESTART IDENTITY CASCADE`;
@@ -1056,6 +1065,298 @@ describe("Users API", () => {
 
       // Act
       const res = await sendUpdateUserProfileRequest(updatedProfileData, token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+
+  describe.only("PATCH /api/users/{userId}/role", () => {
+    it("should return 200 and the updated user role when admin updates role from user to admin", async () => {
+      // Arrange
+      const user = await insertTestUser({ role: "user" });
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        user.id,
+        { role: "admin" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "User role updated successfully",
+        data: {
+          id: user.id,
+          role: "admin",
+        },
+      });
+    });
+
+    it("should return 200 and the updated user role when admin updates role from admin to user", async () => {
+      // Arrange
+      const user = await insertTestUser({ role: "admin" });
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        user.id,
+        { role: "user" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "User role updated successfully",
+        data: {
+          id: user.id,
+          role: "user",
+        },
+      });
+    });
+
+    it("should return 400 when userId is not a positive integer", async () => {
+      // Arrange
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        "invalid_id",
+        { role: "admin" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "params",
+            field: "userId",
+            message: "User ID must be a positive integer",
+          },
+        ],
+      });
+    });
+
+    it("should return 400 when userId is 0", async () => {
+      // Arrange
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        0,
+        { role: "admin" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "params",
+            field: "userId",
+            message: "User ID must be a positive integer",
+          },
+        ],
+      });
+    });
+
+    it("should return 400 when userId is not an integer", async () => {
+      // Arrange
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        1.5,
+        { role: "admin" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "params",
+            field: "userId",
+            message: "User ID must be a positive integer",
+          },
+        ],
+      });
+    });
+
+    it("should return 400 when role is invalid", async () => {
+      // Arrange
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        1,
+        { role: "superadmin" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "role",
+            message: "Invalid role. Allowed values: user, admin",
+          },
+        ],
+      });
+    });
+
+    it("should return 400 when role is missing", async () => {
+      // Arrange
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(1, {}, adminToken);
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "role",
+            message: "Invalid role. Allowed values: user, admin",
+          },
+        ],
+      });
+    });
+
+    it("should return 400 when unrecognized fields are provided", async () => {
+      // Arrange
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        1,
+        { role: "admin", extra: "value" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "body",
+            message: 'Unrecognized key: "extra"',
+          },
+        ],
+      });
+    });
+
+    it("should return 401 when user is not authenticated", async () => {
+      // Act
+      const res = await sendUpdateUserRoleRequest(1, { role: "admin" });
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Arrange
+      const invalidToken = "invalid_token";
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        1,
+        { role: "admin" },
+        invalidToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 403 when requester is regular user", async () => {
+      // Arrange
+      const user = await insertTestUser({ role: "user" });
+      const userToken = generateToken(user);
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        user.id,
+        { role: "admin" },
+        userToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+    });
+
+    it("should return 404 when user is not found", async () => {
+      // Arrange
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        9999,
+        { role: "admin" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "User not found",
+      });
+    });
+
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      mockDatabaseError();
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        1,
+        { role: "admin" },
+        adminToken,
+      );
 
       // Assert
       expect(res.status).toBe(500);

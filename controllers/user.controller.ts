@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import sql from "../db";
 import pg from "postgres";
+import type { UpdateUserRoleInput } from "../schemas/auth.schema";
 
 export async function getAllUsers(
   _req: Request,
@@ -221,6 +222,46 @@ export async function updateUserProfile(
       }
     }
 
+    next(error);
+  }
+}
+
+export async function updateUserRole(
+  req: Request<{ userId: string }, {}, UpdateUserRoleInput>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = Number(req.params.userId);
+    const { role } = req.body;
+
+    const [user] = await sql<
+      [
+        {
+          id: number;
+          role: string;
+        },
+      ]
+    >`
+      UPDATE users 
+      SET role = ${role} 
+      WHERE id = ${userId} 
+      RETURNING id, role;
+    `;
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User role updated successfully",
+      data: user,
+    });
+  } catch (error) {
     next(error);
   }
 }

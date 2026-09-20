@@ -50,8 +50,25 @@ export const updateUserProfileSchema = z.object({
     .strict(),
 });
 
+export const updateUserRoleSchema = z.object({
+  params: z.object({
+    userId: z.coerce
+      .number({ error: "User ID must be a positive integer" })
+      .int({ message: "User ID must be a positive integer" })
+      .positive({ message: "User ID must be a positive integer" }),
+  }),
+  body: z
+    .object({
+      role: z.enum(["user", "admin"], {
+        error: "Invalid role. Allowed values: user, admin",
+      }),
+    })
+    .strict(),
+});
+
 export type UserIdInput = z.input<typeof userIdSchema>["params"];
 export type RegisterInput = z.infer<typeof registerSchema>["body"];
 export type LoginInput = z.infer<typeof loginSchema>["body"];
 export type UpdateUserInput = z.input<typeof updateUserSchema>;
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>["body"];
+export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>["body"];
