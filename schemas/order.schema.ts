@@ -26,4 +26,23 @@ export const cancelOrderSchema = z.object({
   }),
 });
 
+export const updateOrderStatusSchema = z.object({
+  params: z.object({
+    orderId: orderIdParam,
+  }),
+  body: z.object({
+    status: z.enum(["pending", "paid", "shipped", "cancelled"], {
+      error: "Invalid status. Allowed values: pending, paid, shipped, cancelled",
+    }),
+    cancellationReason: z
+      .string({ error: "Cancellation reason must be a string" })
+      .trim()
+      .nonempty({ error: "Cancellation reason cannot be empty" })
+      .nullish(),
+  }),
+});
+
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>["body"];
+export type UpdateOrderStatusInput = z.infer<
+  typeof updateOrderStatusSchema
+>["body"];

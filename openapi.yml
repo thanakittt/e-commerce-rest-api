@@ -955,6 +955,70 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /admin/orders/{orderId}/status:
+    patch:
+      summary: Update order status (Admin)
+      description: Update the processing status of an order. Accessible only by Admin.
+      security:
+        - bearerAuth: []
+      tags:
+        - Admin Orders
+      parameters:
+        - $ref: "#/components/parameters/OrderIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderStatusInput"
+      responses:
+        "200":
+          description: Order status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateOrderStatusResponse"
+              example:
+                success: true
+                message: Order status updated successfully
+                data:
+                  id: 1
+                  status: cancelled
+                  cancellationReason: Ordered by mistake
+        "400":
+          description: Validation failed or invalid order status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              examples:
+                invalidOrderId:
+                  summary: Invalid order ID
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: params
+                        field: orderId
+                        message: Order ID must be a positive integer
+                invalidStatus:
+                  summary: Invalid order status
+                  value:
+                    success: false
+                    message: Validation failed
+                    errors:
+                      - location: body
+                        field: status
+                        message: "Invalid status. Allowed values: pending, paid, shipped, cancelled"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -969,7 +1033,17 @@ components:
       required: true
       schema:
         type: integer
-        example: 1
+      example: 1
+
+    OrderIdParam:
+      name: orderId
+      in: path
+      required: true
+      description: ID of the order to update
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
 
   schemas:
     RegisterInput:
@@ -1420,6 +1494,49 @@ components:
         message:
           type: string
           example: Order cancelled successfully
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            status:
+              type: string
+              example: cancelled
+            cancellationReason:
+              type: string
+              nullable: true
+              example: Ordered by mistake
+
+    UpdateOrderStatusInput:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - pending
+            - paid
+            - shipped
+            - cancelled
+          description: Target order status
+          example: shipped
+        cancellationReason:
+          type: string
+          nullable: true
+          description: Reason for cancellation (used when status is cancelled)
+          example: Customer requested cancellation
+
+    UpdateOrderStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Order status updated successfully
         data:
           type: object
           properties:

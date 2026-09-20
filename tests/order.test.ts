@@ -190,6 +190,23 @@ const sendCancelOrderRequest = async (
   return req;
 };
 
+const sendUpdateOrderStatusRequest = async (
+  orderId: string | number,
+  payload?: Record<string, unknown>,
+  tokenOrHeader?: string,
+  rawHeader = false,
+) => {
+  const req = request(app).patch(`/api/admin/orders/${orderId}/status`);
+  if (tokenOrHeader) {
+    const headerValue = rawHeader ? tokenOrHeader : `Bearer ${tokenOrHeader}`;
+    req.set("Authorization", headerValue);
+  }
+  if (payload !== undefined) {
+    req.send(payload);
+  }
+  return req;
+};
+
 const mockDatabaseError = () => {
   spyOn(db, "default").mockRejectedValue(new Error("Simulated database error"));
   spyOn(console, "error").mockImplementation(() => {});
@@ -1619,6 +1636,485 @@ describe("GET /api/admin/orders", () => {
 
       // Act
       const res = await sendGetAdminOrdersRequest(token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("PATCH /api/admin/orders/:orderId/status", () => {
+  describe("Success Cases (200 OK)", () => {
+    it("should return 200 and updated status when admin updates status from pending to paid", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const user = await insertTestUser();
+      const adminToken = generateToken(admin);
+      const order = await insertTestOrder(user, { status: "pending" });
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        order.id,
+        { status: "paid" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order status updated successfully",
+        data: {
+          id: order.id,
+          status: "paid",
+          cancellationReason: null,
+        },
+      });
+
+      const [dbOrder] = await sql<
+        [{ status: string; cancellationReason: string | null }]
+      >`
+        SELECT status, cancellation_reason as "cancellationReason" FROM orders WHERE id = ${order.id}
+      `;
+      expect(dbOrder.status).toBe("paid");
+      expect(dbOrder.cancellationReason).toBeNull();
+    });
+
+    it("should return 200 and updated status when admin updates status from paid to shipped", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const user = await insertTestUser();
+      const adminToken = generateToken(admin);
+      const order = await insertTestOrder(user, { status: "paid" });
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        order.id,
+        { status: "shipped" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order status updated successfully",
+        data: {
+          id: order.id,
+          status: "shipped",
+          cancellationReason: null,
+        },
+      });
+
+      const [dbOrder] = await sql<[TestOrder]>`
+        SELECT * FROM orders WHERE id = ${order.id}
+      `;
+      expect(dbOrder.status).toBe("shipped");
+    });
+
+    it("should return 200 and cancellationReason when admin updates status to cancelled with reason", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const user = await insertTestUser();
+      const adminToken = generateToken(admin);
+      const order = await insertTestOrder(user, { status: "pending" });
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        order.id,
+        {
+          status: "cancelled",
+          cancellationReason: "Customer requested cancellation",
+        },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order status updated successfully",
+        data: {
+          id: order.id,
+          status: "cancelled",
+          cancellationReason: "Customer requested cancellation",
+        },
+      });
+
+      const [dbOrder] = await sql<
+        [{ status: string; cancellationReason: string | null }]
+      >`
+        SELECT status, cancellation_reason as "cancellationReason" FROM orders WHERE id = ${order.id}
+      `;
+      expect(dbOrder.status).toBe("cancelled");
+      expect(dbOrder.cancellationReason).toBe(
+        "Customer requested cancellation",
+      );
+    });
+
+    it("should return 200 and set cancellationReason to null when admin cancels without cancellationReason", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const user = await insertTestUser();
+      const adminToken = generateToken(admin);
+      const order = await insertTestOrder(user, { status: "pending" });
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        order.id,
+        { status: "cancelled" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order status updated successfully",
+        data: {
+          id: order.id,
+          status: "cancelled",
+          cancellationReason: null,
+        },
+      });
+
+      const [dbOrder] = await sql<
+        [{ status: string; cancellationReason: string | null }]
+      >`
+        SELECT status, cancellation_reason as "cancellationReason" FROM orders WHERE id = ${order.id}
+      `;
+      expect(dbOrder.status).toBe("cancelled");
+      expect(dbOrder.cancellationReason).toBeNull();
+    });
+
+    it("should return 200 and set cancellationReason to null when admin cancels with explicit null reason", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const user = await insertTestUser();
+      const adminToken = generateToken(admin);
+      const order = await insertTestOrder(user, { status: "pending" });
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        order.id,
+        { status: "cancelled", cancellationReason: null },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order status updated successfully",
+        data: {
+          id: order.id,
+          status: "cancelled",
+          cancellationReason: null,
+        },
+      });
+    });
+
+    it("should clear cancellationReason to null when status changes from cancelled to shipped", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const user = await insertTestUser();
+      const adminToken = generateToken(admin);
+      const order = await insertTestOrder(user, {
+        status: "cancelled",
+        cancellationReason: "Old reason",
+      });
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        order.id,
+        { status: "shipped" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Order status updated successfully",
+        data: {
+          id: order.id,
+          status: "shipped",
+          cancellationReason: null,
+        },
+      });
+
+      const [dbOrder] = await sql<
+        [{ status: string; cancellationReason: string | null }]
+      >`
+        SELECT status, cancellation_reason as "cancellationReason" FROM orders WHERE id = ${order.id}
+      `;
+      expect(dbOrder.status).toBe("shipped");
+      expect(dbOrder.cancellationReason).toBeNull();
+    });
+  });
+
+  describe("Not Found (404)", () => {
+    it("should return 404 when order does not exist", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const adminToken = generateToken(admin);
+      const nonExistentOrderId = 999999;
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        nonExistentOrderId,
+        { status: "shipped" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Not found",
+      });
+    });
+  });
+
+  describe("Validation Errors - Params (400)", () => {
+    const paramCases = [
+      {
+        scenario: "orderId is not a number",
+        orderId: "abc",
+        message: "Order ID is required",
+      },
+      {
+        scenario: "orderId is not an integer",
+        orderId: "1.5",
+        message: "Order ID must be an integer",
+      },
+      {
+        scenario: "orderId is zero",
+        orderId: "0",
+        message: "Order ID must be a positive integer",
+      },
+      {
+        scenario: "orderId is negative",
+        orderId: "-1",
+        message: "Order ID must be a positive integer",
+      },
+    ];
+
+    it.each(paramCases)(
+      "should return 400 when $scenario",
+      async ({ orderId, message }) => {
+        // Arrange
+        const admin = await insertTestUser({ role: "admin" });
+        const adminToken = generateToken(admin);
+
+        // Act
+        const res = await sendUpdateOrderStatusRequest(
+          orderId,
+          { status: "paid" },
+          adminToken,
+        );
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "params",
+              field: "orderId",
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Validation Errors - Body (400)", () => {
+    const bodyCases = [
+      {
+        scenario: "status is missing",
+        payload: {},
+        field: "status",
+        message:
+          "Invalid status. Allowed values: pending, paid, shipped, cancelled",
+      },
+      {
+        scenario: "status is invalid value",
+        payload: { status: "invalid_status" },
+        field: "status",
+        message:
+          "Invalid status. Allowed values: pending, paid, shipped, cancelled",
+      },
+      {
+        scenario: "status is not a string",
+        payload: { status: 123 },
+        field: "status",
+        message:
+          "Invalid status. Allowed values: pending, paid, shipped, cancelled",
+      },
+      {
+        scenario: "cancellationReason is empty string",
+        payload: { status: "cancelled", cancellationReason: "" },
+        field: "cancellationReason",
+        message: "Cancellation reason cannot be empty",
+      },
+      {
+        scenario: "cancellationReason is whitespace only",
+        payload: { status: "cancelled", cancellationReason: "   " },
+        field: "cancellationReason",
+        message: "Cancellation reason cannot be empty",
+      },
+      {
+        scenario: "cancellationReason is not a string",
+        payload: { status: "cancelled", cancellationReason: 123 },
+        field: "cancellationReason",
+        message: "Cancellation reason must be a string",
+      },
+    ];
+
+    it.each(bodyCases)(
+      "should return 400 when $scenario",
+      async ({ payload, field, message }) => {
+        // Arrange
+        const admin = await insertTestUser({ role: "admin" });
+        const adminToken = generateToken(admin);
+        const user = await insertTestUser();
+        const order = await insertTestOrder(user);
+
+        // Act
+        const res = await sendUpdateOrderStatusRequest(
+          order.id,
+          payload as Record<string, unknown>,
+          adminToken,
+        );
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "body",
+              field,
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Authentication & Authorization (401 / 403)", () => {
+    it("should return 401 when Authorization header is missing", async () => {
+      // Act
+      const res = await sendUpdateOrderStatusRequest(1, { status: "paid" });
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when Authorization header does not start with Bearer", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const token = generateToken(admin);
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        1,
+        { status: "paid" },
+        `Basic ${token}`,
+        true,
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        1,
+        { status: "paid" },
+        "invalid.token.here",
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is expired", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const expiredToken = generateToken(admin, "-1s");
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        1,
+        { status: "paid" },
+        expiredToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 403 when user is not an admin", async () => {
+      // Arrange
+      const regularUser = await insertTestUser({ role: "user" });
+      const token = generateToken(regularUser);
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        1,
+        { status: "paid" },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const token = generateToken(admin);
+      mockDatabaseError();
+
+      // Act
+      const res = await sendUpdateOrderStatusRequest(
+        1,
+        { status: "paid" },
+        token,
+      );
 
       // Assert
       expect(res.status).toBe(500);

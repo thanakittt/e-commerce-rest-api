@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 import sql from "../db";
-import type { CancelOrderInput } from "../schemas/order.schema";
+import type {
+  CancelOrderInput,
+  UpdateOrderStatusInput,
+} from "../schemas/order.schema";
 
 interface FormattedOrderItem {
   productId: number;
@@ -271,6 +274,45 @@ export async function cancelOrder(
     return res.status(200).json({
       success: true,
       message: "Order cancelled successfully",
+      data: updatedOrder,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateOrderStatus(
+  req: Request<{ orderId: string }, {}, UpdateOrderStatusInput>,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const orderId = Number(req.params.orderId);
+    const { status, cancellationReason } = req.body;
+    const reason = status === "cancelled" ? (cancellationReason ?? null) : null;
+
+    const [updatedOrder] = await sql<[CancelledOrderRow]>`
+      UPDATE orders
+      SET
+        status = ${status},
+        cancellation_reason = ${reason}
+      WHERE id = ${orderId}
+      RETURNING
+        id,
+        status,
+        cancellation_reason as "cancellationReason"
+    `;
+
+    if (!updatedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Order status updated successfully",
       data: updatedOrder,
     });
   } catch (error) {
