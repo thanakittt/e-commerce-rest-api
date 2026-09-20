@@ -152,6 +152,16 @@ const sendGetOrdersRequest = async (
   return req.set("Authorization", headerValue);
 };
 
+const sendGetAdminOrdersRequest = async (
+  tokenOrHeader?: string,
+  rawHeader = false,
+) => {
+  const req = request(app).get("/api/admin/orders");
+  if (!tokenOrHeader) return req;
+  const headerValue = rawHeader ? tokenOrHeader : `Bearer ${tokenOrHeader}`;
+  return req.set("Authorization", headerValue);
+};
+
 const sendGetOrderByIdRequest = async (
   id: string | number,
   tokenOrHeader?: string,
@@ -213,14 +223,14 @@ const toOrderItemResponse = (
   productId: number,
   name: string,
   quantity: number,
-  unitPrice: string,
+  unitPrice: string | number,
   subtotal: number,
 ) => {
   return {
     productId,
     name,
     quantity,
-    unitPrice: parseFloat(unitPrice).toFixed(2),
+    unitPrice: parseFloat(unitPrice.toString()).toFixed(2),
     subtotal: subtotal.toFixed(2),
   };
 };
@@ -1389,6 +1399,226 @@ describe("PATCH /api/orders/{id}/cancel", () => {
         { reason: "Changed my mind" },
         token,
       );
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
+describe("GET /api/admin/orders", () => {
+  describe("Success Cases (200 OK)", () => {
+    it("should return 200 with empty array when no orders exist in system", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const token = generateToken(admin);
+
+      // Act
+      const res = await sendGetAdminOrdersRequest(token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Orders fetched successfully",
+        data: [],
+      });
+    });
+
+    it("should return 200 with all orders across all users with aggregated totals and items", async () => {
+      // Arrange
+      const admin = await insertTestUser({
+        role: "admin",
+        email: "admin_orders@example.com",
+      });
+      const userA = await insertTestUser({ email: "usera_orders@example.com" });
+      const userB = await insertTestUser({ email: "userb_orders@example.com" });
+      const adminToken = generateToken(admin);
+
+      const product1 = await insertTestProduct({
+        name: "Product 1",
+        price: 100,
+      });
+      const product2 = await insertTestProduct({
+        name: "Product 2",
+        price: 50,
+      });
+
+      const orderA = await insertTestOrder(userA, {
+        orderDate: new Date("2026-01-01T10:00:00.000Z"),
+      });
+      await insertTestOrderItem(orderA.id, product1.id, 2, product1.price);
+
+      const orderB = await insertTestOrder(userB, {
+        orderDate: new Date("2026-01-02T10:00:00.000Z"),
+      });
+      await insertTestOrderItem(orderB.id, product2.id, 1, product2.price);
+
+      const expectedOrderA = toOrderDetailResponse(orderA, 200, 2, [
+        toOrderItemResponse(product1.id, "Product 1", 2, product1.price, 200),
+      ]);
+      const expectedOrderB = toOrderDetailResponse(orderB, 50, 1, [
+        toOrderItemResponse(product2.id, "Product 2", 1, product2.price, 50),
+      ]);
+
+      // Act
+      const res = await sendGetAdminOrdersRequest(adminToken);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Orders fetched successfully",
+        data: [expectedOrderB, expectedOrderA],
+      });
+    });
+
+    it("should return orders sorted by orderDate descending (newer first)", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const user = await insertTestUser();
+      const adminToken = generateToken(admin);
+
+      const product = await insertTestProduct({ price: 10 });
+
+      const olderOrder = await insertTestOrder(user, {
+        orderDate: new Date("2026-01-01T00:00:00.000Z"),
+      });
+      await insertTestOrderItem(olderOrder.id, product.id, 1, product.price);
+
+      const newerOrder = await insertTestOrder(user, {
+        orderDate: new Date("2026-01-05T00:00:00.000Z"),
+      });
+      await insertTestOrderItem(newerOrder.id, product.id, 1, product.price);
+
+      // Act
+      const res = await sendGetAdminOrdersRequest(adminToken);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.data[0].id).toBe(newerOrder.id);
+      expect(res.body.data[1].id).toBe(olderOrder.id);
+    });
+
+    it("should include cancellationReason when order is cancelled", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const user = await insertTestUser();
+      const adminToken = generateToken(admin);
+
+      const product = await insertTestProduct({ price: 30 });
+
+      const cancelledOrder = await insertTestOrder(user, {
+        status: "cancelled",
+        cancellationReason: "Customer changed their mind",
+      });
+      await insertTestOrderItem(
+        cancelledOrder.id,
+        product.id,
+        1,
+        product.price,
+      );
+
+      // Act
+      const res = await sendGetAdminOrdersRequest(adminToken);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body.data[0].status).toBe("cancelled");
+      expect(res.body.data[0].cancellationReason).toBe(
+        "Customer changed their mind",
+      );
+    });
+  });
+
+  describe("Authentication & Authorization (401 / 403)", () => {
+    it("should return 401 when Authorization header is missing", async () => {
+      // Act
+      const res = await sendGetAdminOrdersRequest();
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when Authorization header does not start with Bearer", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const token = generateToken(admin);
+
+      // Act
+      const res = await sendGetAdminOrdersRequest(`Basic ${token}`, true);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Act
+      const res = await sendGetAdminOrdersRequest("invalid.token.here");
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is expired", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const expiredToken = generateToken(admin, "-1s");
+
+      // Act
+      const res = await sendGetAdminOrdersRequest(expiredToken);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 403 when user is not an admin", async () => {
+      // Arrange
+      const user = await insertTestUser({ role: "user" });
+      const token = generateToken(user);
+
+      // Act
+      const res = await sendGetAdminOrdersRequest(token);
+
+      // Assert
+      expect(res.status).toBe(403);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Forbidden",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      const admin = await insertTestUser({ role: "admin" });
+      const token = generateToken(admin);
+      mockDatabaseError();
+
+      // Act
+      const res = await sendGetAdminOrdersRequest(token);
 
       // Assert
       expect(res.status).toBe(500);

@@ -90,6 +90,52 @@ export async function getOrdersByUserId(
   }
 }
 
+export async function getAllOrders(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const orders = await sql<OrderDetailRow[]>`
+        SELECT 
+            o.id,
+            o.user_id as "userId",
+            o.order_date as "orderDate",
+            o.status,
+            o.shipping_address as "shippingAddress",
+            o.payment_method as "paymentMethod",
+            o.cancellation_reason as "cancellationReason",
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'productId', p.id,
+                  'name', p.name,
+                  'quantity', oi.quantity,
+                  'unitPrice', oi.unit_price::text,
+                  'subtotal', ROUND((oi.quantity * oi.unit_price)::numeric, 2)::text
+                ) ORDER BY oi.product_id ASC
+              ) FILTER (WHERE oi.product_id IS NOT NULL),
+              '[]'
+            ) as "items",
+            COALESCE(ROUND(SUM(oi.quantity * oi.unit_price)::numeric, 2), 0) as "totalPrice",
+            COALESCE(SUM(oi.quantity)::integer, 0) as "totalQuantity"
+        FROM orders o
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN products p ON oi.product_id = p.id
+        GROUP BY o.id
+        ORDER BY o.order_date DESC, o.id DESC
+    `;
+
+    return res.status(200).json({
+      success: true,
+      message: "Orders fetched successfully",
+      data: orders.map(formatOrderDetail),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getOrderById(
   req: Request<{ id: string }>,
   res: Response,

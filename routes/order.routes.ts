@@ -26,3 +26,4 @@ orderRouter.patch(
 );
 
 export default orderRouter;
+export { default as adminOrderRouter } from "./admin.order.routes";
