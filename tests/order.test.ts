@@ -194,6 +194,7 @@ const toOrderResponse = (
   orderDate: Date,
   totalPrice: number,
   totalQuantity: number,
+  cancellationReason: string | null = null,
 ) => {
   return {
     id: orderId,
@@ -201,6 +202,7 @@ const toOrderResponse = (
     status,
     shippingAddress,
     paymentMethod,
+    cancellationReason,
     orderDate: orderDate.toISOString(),
     totalPrice: totalPrice.toFixed(2),
     totalQuantity,
@@ -239,6 +241,7 @@ const toOrderDetailResponse = (
       order.orderDate,
       totalPrice,
       totalQuantity,
+      order.cancellationReason,
     ),
     items,
   };
@@ -346,6 +349,7 @@ describe("GET /api/orders", () => {
             userId: user.id,
             shippingAddress: order2.shippingAddress,
             paymentMethod: order2.paymentMethod,
+            cancellationReason: null,
             status: order2.status,
             totalPrice: totalPrice2.toFixed(2),
             totalQuantity: totalQuantity2,
@@ -372,6 +376,7 @@ describe("GET /api/orders", () => {
             userId: user.id,
             shippingAddress: order1.shippingAddress,
             paymentMethod: order1.paymentMethod,
+            cancellationReason: null,
             status: order1.status,
             totalPrice: totalPrice1.toFixed(2),
             totalQuantity: totalQuantity1,

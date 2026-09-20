@@ -777,6 +777,7 @@ paths:
                     shippingAddress: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
                     paymentMethod: credit_card
                     status: pending
+                    cancellationReason: null
                     totalPrice: "289.49"
                     totalQuantity: 2
                     orderDate: "2026-09-19T00:00:00.000Z"
@@ -822,6 +823,7 @@ paths:
                   shippingAddress: "123 Sukhumvit Rd, Khlong Toei, Bangkok 10110"
                   paymentMethod: credit_card
                   status: pending
+                  cancellationReason: null
                   totalPrice: "289.49"
                   totalQuantity: 2
                   orderDate: "2026-09-19T00:00:00.000Z"

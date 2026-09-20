@@ -17,6 +17,7 @@ interface OrderDetailRow {
   status: string;
   shippingAddress: string;
   paymentMethod: string;
+  cancellationReason: string | null;
   items: FormattedOrderItem[];
   totalPrice: string;
   totalQuantity: number;
@@ -56,6 +57,7 @@ export async function getOrdersByUserId(
             o.status,
             o.shipping_address as "shippingAddress",
             o.payment_method as "paymentMethod",
+            o.cancellation_reason as "cancellationReason",
             COALESCE(
               json_agg(
                 json_build_object(
@@ -106,6 +108,7 @@ export async function getOrderById(
             o.status,
             o.shipping_address as "shippingAddress",
             o.payment_method as "paymentMethod",
+            o.cancellation_reason as "cancellationReason",
             COALESCE(
               json_agg(
                 json_build_object(
