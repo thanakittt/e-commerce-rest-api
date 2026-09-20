@@ -84,6 +84,28 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /users/profile:
+    get:
+      summary: Get current user profile
+      description: Get profile of the currently logged-in user
+      security:
+        - bearerAuth: []
+      tags:
+        - Users
+      responses:
+        "200":
+          description: Profile fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /users/{id}:
     get:
       summary: Get a user by ID

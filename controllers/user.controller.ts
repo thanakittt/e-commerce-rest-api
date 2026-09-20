@@ -122,3 +122,40 @@ export async function updateUserById(
     next(error);
   }
 }
+
+export async function getUserProfile(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const userId = Number(req.userId);
+
+    const [user] = await sql<
+      [
+        {
+          id: number;
+          name: string;
+          email: string;
+          phone: string | null;
+          role: string;
+        },
+      ]
+    >`SELECT id, name, email, phone, role FROM users WHERE id = ${userId}`;
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User profile fetched successfully",
+      data: user,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

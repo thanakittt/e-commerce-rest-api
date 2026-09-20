@@ -13,6 +13,8 @@ userRoutes.get(
   UserController.getAllUsers,
 );
 
+userRoutes.get("/profile", authenticate, UserController.getUserProfile);
+
 userRoutes.get(
   "/:id",
   authenticate,

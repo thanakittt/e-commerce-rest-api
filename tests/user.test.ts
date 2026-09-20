@@ -75,6 +75,11 @@ const sendUpdateUserByIdRequest = (
   return token ? req.set("Authorization", `Bearer ${token}`) : req;
 };
 
+const sendGetUserProfileRequest = (token?: string) => {
+  const req = request(app).get("/api/users/profile");
+  return token ? req.set("Authorization", `Bearer ${token}`) : req;
+};
+
 describe("Users API", () => {
   beforeEach(async () => {
     await sql`TRUNCATE TABLE users RESTART IDENTITY CASCADE`;
@@ -729,6 +734,83 @@ describe("Users API", () => {
 
       // Act
       const res = await sendUpdateUserByIdRequest(1, updatedUserData, token);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+
+  describe("GET /api/users/profile", () => {
+    it("should return 200 and user profile when authenticated", async () => {
+      // Arrange
+      const user = await insertTestUser();
+      const token = generateToken(user);
+
+      // Act
+      const res = await sendGetUserProfileRequest(token);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "User profile fetched successfully",
+        data: user,
+      });
+    });
+
+    it("should return 401 when user is not authenticated", async () => {
+      // Act
+      const res = await sendGetUserProfileRequest();
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 401 when token is invalid", async () => {
+      // Arrange
+      const invalidToken = "invalid_token";
+
+      // Act
+      const res = await sendGetUserProfileRequest(invalidToken);
+
+      // Assert
+      expect(res.status).toBe(401);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Unauthorized",
+      });
+    });
+
+    it("should return 404 when user is not found", async () => {
+      // Arrange
+      const token = generateToken({ id: 999 });
+
+      // Act
+      const res = await sendGetUserProfileRequest(token);
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "User not found",
+      });
+    });
+
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      mockDatabaseError();
+      const token = generateToken();
+
+      // Act
+      const res = await sendGetUserProfileRequest(token);
 
       // Assert
       expect(res.status).toBe(500);
