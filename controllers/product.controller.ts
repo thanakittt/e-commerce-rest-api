@@ -56,6 +56,35 @@ export async function getAllProducts(
   }
 }
 
+export async function getProductById(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+) {
+  const productId = Number(req.params.id);
+
+  try {
+    const [product] = await sql<[ProductRow?]>`
+      SELECT * FROM products WHERE id = ${productId}
+    `;
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Product fetched successfully",
+      data: formatProductResponse(product),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function createProduct(
   req: Request<{}, {}, CreateProductInput>,
   res: Response,

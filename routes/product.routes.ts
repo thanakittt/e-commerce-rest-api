@@ -3,6 +3,7 @@ import {
   createProduct,
   deleteProduct,
   getAllProducts,
+  getProductById,
   updateProduct,
 } from "../controllers/product.controller";
 import { validate } from "../middlewares/validate.middleware";
@@ -17,6 +18,7 @@ import { authenticate, authorizeRoles } from "../middlewares/auth.middleware";
 const productRouter = Router();
 
 productRouter.get("/", validate(getProductsQuerySchema), getAllProducts);
+productRouter.get("/:id", validate(productIdSchema), getProductById);
 
 productRouter.post(
   "/",

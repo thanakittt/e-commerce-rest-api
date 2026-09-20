@@ -134,6 +134,10 @@ const sendGetAllProductsRequest = async (queryString?: string) => {
   return request(app).get(url);
 };
 
+const sendGetProductByIdRequest = async (id: number | string) => {
+  return request(app).get(`/api/products/${id}`);
+};
+
 const mockDatabaseError = () => {
   spyOn(db, "default").mockRejectedValue(new Error("Simulated database error"));
   spyOn(console, "error").mockImplementation(() => {});
@@ -1303,3 +1307,148 @@ describe("GET /api/products", () => {
     });
   });
 });
+
+describe("GET /api/products/:id", () => {
+  describe("Happy Path (200 OK)", () => {
+    it("should return 200 and the product when product exists", async () => {
+      // Arrange
+      const category = await insertTestCategory();
+      const product = await insertTestProduct({ categoryId: category.id });
+
+      // Act
+      const res = await sendGetProductByIdRequest(product.id);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Product fetched successfully",
+        data: {
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          stock: product.stock,
+          categoryId: category.id,
+        },
+      });
+    });
+
+    it("should return 200 and product when optional fields are null", async () => {
+      // Arrange
+      const product = await insertTestProduct({
+        description: null,
+        categoryId: null,
+      });
+
+      // Act
+      const res = await sendGetProductByIdRequest(product.id);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual({
+        success: true,
+        message: "Product fetched successfully",
+        data: {
+          id: product.id,
+          name: product.name,
+          description: null,
+          price: product.price,
+          stock: product.stock,
+          categoryId: null,
+        },
+      });
+    });
+
+    it("should properly format decimal price", async () => {
+      // Arrange
+      const product = await insertTestProduct({ price: 19.9 });
+
+      // Act
+      const res = await sendGetProductByIdRequest(product.id);
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.body.data.price).toBe("19.90");
+    });
+  });
+
+  describe("Validation Errors - Params (400)", () => {
+    const idValidationCases = [
+      {
+        scenario: "id is not a number",
+        id: "abc",
+        message: "Invalid product ID",
+      },
+      {
+        scenario: "id is not an integer",
+        id: "1.5",
+        message: "Product ID must be an integer",
+      },
+      {
+        scenario: "id is zero",
+        id: "0",
+        message: "Product ID must be a positive integer",
+      },
+      {
+        scenario: "id is negative",
+        id: "-1",
+        message: "Product ID must be a positive integer",
+      },
+    ];
+
+    it.each(idValidationCases)(
+      "should return 400 when $scenario",
+      async ({ id, message }) => {
+        // Act
+        const res = await sendGetProductByIdRequest(id);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toStrictEqual({
+          success: false,
+          message: "Validation failed",
+          errors: [
+            {
+              location: "params",
+              field: "id",
+              message,
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  describe("Not Found (404)", () => {
+    it("should return 404 when product is not found", async () => {
+      // Act
+      const res = await sendGetProductByIdRequest(99999);
+
+      // Assert
+      expect(res.status).toBe(404);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Product not found",
+      });
+    });
+  });
+
+  describe("Server Errors (500)", () => {
+    it("should return 500 when database server is down", async () => {
+      // Arrange
+      mockDatabaseError();
+
+      // Act
+      const res = await sendGetProductByIdRequest(1);
+
+      // Assert
+      expect(res.status).toBe(500);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Internal server error",
+      });
+    });
+  });
+});
+
