@@ -1,11 +1,5 @@
 import { Router } from "express";
-import {
-  createProduct,
-  deleteProduct,
-  getAllProducts,
-  getProductById,
-  updateProduct,
-} from "../controllers/product.controller";
+import * as ProductController from "../controllers/product.controller";
 import { validate } from "../middlewares/validate.middleware";
 import {
   createProductSchema,
@@ -17,15 +11,23 @@ import { authenticate, authorizeRoles } from "../middlewares/auth.middleware";
 
 const productRouter = Router();
 
-productRouter.get("/", validate(getProductsQuerySchema), getAllProducts);
-productRouter.get("/:id", validate(productIdSchema), getProductById);
+productRouter.get(
+  "/",
+  validate(getProductsQuerySchema),
+  ProductController.getAllProducts,
+);
+productRouter.get(
+  "/:id",
+  validate(productIdSchema),
+  ProductController.getProductById,
+);
 
 productRouter.post(
   "/",
   authenticate,
   authorizeRoles(["admin"]),
   validate(createProductSchema),
-  createProduct,
+  ProductController.createProduct,
 );
 
 productRouter.put(
@@ -33,7 +35,7 @@ productRouter.put(
   authenticate,
   authorizeRoles(["admin"]),
   validate(updateProductSchema),
-  updateProduct,
+  ProductController.updateProduct,
 );
 
 productRouter.delete(
@@ -41,7 +43,7 @@ productRouter.delete(
   authenticate,
   authorizeRoles(["admin"]),
   validate(productIdSchema),
-  deleteProduct,
+  ProductController.deleteProduct,
 );
 
 export default productRouter;

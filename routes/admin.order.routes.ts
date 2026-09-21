@@ -1,8 +1,5 @@
 import { Router } from "express";
-import {
-  getAllOrders,
-  updateOrderStatus,
-} from "../controllers/order.controller";
+import * as OrderController from "../controllers/order.controller";
 import { authenticate, authorizeRoles } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import { updateOrderStatusSchema } from "../schemas/order.schema";
@@ -13,7 +10,7 @@ adminOrderRouter.get(
   "/",
   authenticate,
   authorizeRoles(["admin"]),
-  getAllOrders,
+  OrderController.getAllOrders,
 );
 
 adminOrderRouter.patch(
@@ -21,7 +18,7 @@ adminOrderRouter.patch(
   authenticate,
   authorizeRoles(["admin"]),
   validate(updateOrderStatusSchema),
-  updateOrderStatus,
+  OrderController.updateOrderStatus,
 );
 
 export default adminOrderRouter;

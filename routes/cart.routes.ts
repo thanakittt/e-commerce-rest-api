@@ -1,12 +1,5 @@
 import { Router } from "express";
-import {
-  checkout,
-  createCart,
-  deleteCartById,
-  deleteCartItem,
-  getCartById,
-  updateCartItem,
-} from "../controllers/cart.controller";
+import * as CartController from "../controllers/cart.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
@@ -20,36 +13,46 @@ import {
 
 const cartRouter = Router();
 
-cartRouter.post("/", authenticate, validate(createCartSchema), createCart);
+cartRouter.post(
+  "/",
+  authenticate,
+  validate(createCartSchema),
+  CartController.createCart,
+);
 
-cartRouter.get("/:id", authenticate, validate(getCartByIdSchema), getCartById);
+cartRouter.get(
+  "/:id",
+  authenticate,
+  validate(getCartByIdSchema),
+  CartController.getCartById,
+);
 
 cartRouter.delete(
   "/:id",
   authenticate,
   validate(deleteCartByIdSchema),
-  deleteCartById,
+  CartController.deleteCartById,
 );
 
 cartRouter.delete(
   "/:cartId/items/:productId",
   authenticate,
   validate(deleteCartItemSchema),
-  deleteCartItem,
+  CartController.deleteCartItem,
 );
 
 cartRouter.put(
   "/:cartId/items/:productId",
   authenticate,
   validate(updateCartItemSchema),
-  updateCartItem,
+  CartController.updateCartItem,
 );
 
 cartRouter.post(
   "/:id/checkout",
   authenticate,
   validate(checkoutSchema),
-  checkout,
+  CartController.checkout,
 );
 
 export default cartRouter;
