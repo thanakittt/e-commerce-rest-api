@@ -5,7 +5,7 @@ import type {
   UpdateUserInput,
   UpdateUserProfileInput,
   UpdateUserRoleInput,
-} from "../schemas/auth.schema";
+} from "../schemas/user.schema";
 
 export async function getAllUsers(
   _req: Request,

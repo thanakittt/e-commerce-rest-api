@@ -7,7 +7,7 @@ import {
   updateUserRoleSchema,
   updateUserSchema,
   getUserByIdSchema,
-} from "../schemas/auth.schema";
+} from "../schemas/user.schema";
 
 const userRoutes = Router();
 

@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import type { LoginInput, RegisterInput } from "../schemas/auth.schema";
+import type { LoginInput, RegisterInput } from "../schemas/user.schema";
 import sql from "../db";
 import pg from "postgres";
 import jwt from "jsonwebtoken";
