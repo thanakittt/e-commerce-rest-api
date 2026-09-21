@@ -1,7 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
 import sql from "../db";
 import pg from "postgres";
-import type { UpdateUserRoleInput } from "../schemas/auth.schema";
+import type {
+  UpdateUserInput,
+  UpdateUserProfileInput,
+  UpdateUserRoleInput,
+} from "../schemas/auth.schema";
 
 export async function getAllUsers(
   _req: Request,
@@ -23,7 +27,7 @@ export async function getAllUsers(
 }
 
 export async function getUserById(
-  req: Request,
+  req: Request<{ id: string }>,
   res: Response,
   next: NextFunction,
 ) {
@@ -60,7 +64,7 @@ export async function getUserById(
 }
 
 export async function updateUserById(
-  req: Request,
+  req: Request<{ id: string }, {}, UpdateUserInput>,
   res: Response,
   next: NextFunction,
 ) {
@@ -162,7 +166,7 @@ export async function getUserProfile(
 }
 
 export async function updateUserProfile(
-  req: Request,
+  req: Request<{}, {}, UpdateUserProfileInput>,
   res: Response,
   next: NextFunction,
 ) {
@@ -227,12 +231,12 @@ export async function updateUserProfile(
 }
 
 export async function updateUserRole(
-  req: Request<{ userId: string }, {}, UpdateUserRoleInput>,
+  req: Request<{ id: string }, {}, UpdateUserRoleInput>,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const userId = Number(req.params.userId);
+    const userId = Number(req.params.id);
     const { role } = req.body;
 
     const [user] = await sql<

@@ -1,74 +1,93 @@
 import { z } from "zod";
 
-export const userIdSchema = z.object({
+const userId = z.coerce
+  .number({ error: "Invalid user ID" })
+  .int({ message: "User ID must be an integer" })
+  .positive({ message: "User ID must be a positive integer" });
+
+const name = z
+  .string({ error: "Name is required" })
+  .trim()
+  .nonempty({ error: "Name cannot be empty" });
+
+const email = z.email({ error: "Invalid email address" }).toLowerCase();
+
+const password = z
+  .string({ error: "Password is required" })
+  .min(8, { error: "Password must be at least 8 characters long" });
+
+const phone = z.string().trim().nullish();
+
+const role = z.enum(["user", "admin"], {
+  error: "Invalid role. Allowed values: user, admin",
+});
+
+export const getUserByIdSchema = z.object({
   params: z.object({
-    id: z.coerce
-      .number({ error: "Invalid user ID" })
-      .int({ message: "User ID must be an integer" })
-      .positive({ message: "User ID must be a positive integer" }),
+    id: userId,
   }),
 });
 
-const userBaseSchema = z.object({
-  name: z
-    .string({ error: "Name is required" })
-    .trim()
-    .nonempty({ error: "Name cannot be empty" }),
-  email: z.email({ error: "Invalid email address" }).toLowerCase(),
-  password: z
-    .string({ error: "Password is required" })
-    .min(8, { error: "Password must be at least 8 characters long" }),
-  phone: z.string().trim().optional(),
-});
-
 export const registerSchema = z.object({
-  body: userBaseSchema,
+  body: z
+    .object({
+      name,
+      email,
+      password,
+      phone,
+    })
+    .strict(),
 });
 
 export const loginSchema = z.object({
-  body: userBaseSchema.omit({ name: true, phone: true }),
+  body: z
+    .object({
+      email,
+      password,
+    })
+    .strict(),
 });
 
 export const updateUserSchema = z.object({
-  params: userIdSchema.shape.params,
-  body: userBaseSchema
-    .pick({
-      name: true,
-      email: true,
-      phone: true,
+  params: z.object({
+    id: userId,
+  }),
+  body: z
+    .object({
+      name,
+      email,
+      phone,
     })
     .strict(),
 });
 
 export const updateUserProfileSchema = z.object({
-  body: userBaseSchema
-    .pick({
-      name: true,
-      email: true,
-      phone: true,
+  body: z
+    .object({
+      name,
+      email,
+      phone,
     })
     .strict(),
 });
 
 export const updateUserRoleSchema = z.object({
   params: z.object({
-    userId: z.coerce
-      .number({ error: "User ID must be a positive integer" })
-      .int({ message: "User ID must be a positive integer" })
-      .positive({ message: "User ID must be a positive integer" }),
+    id: userId,
   }),
   body: z
     .object({
-      role: z.enum(["user", "admin"], {
-        error: "Invalid role. Allowed values: user, admin",
-      }),
+      role,
     })
     .strict(),
 });
 
-export type UserIdInput = z.input<typeof userIdSchema>["params"];
 export type RegisterInput = z.infer<typeof registerSchema>["body"];
 export type LoginInput = z.infer<typeof loginSchema>["body"];
-export type UpdateUserInput = z.input<typeof updateUserSchema>;
-export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>["body"];
+
+export type GetUserByIdInput = z.infer<typeof getUserByIdSchema>["params"];
+export type UpdateUserInput = z.infer<typeof updateUserSchema>["body"];
+export type UpdateUserProfileInput = z.infer<
+  typeof updateUserProfileSchema
+>["body"];
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>["body"];

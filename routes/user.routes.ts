@@ -6,7 +6,7 @@ import {
   updateUserProfileSchema,
   updateUserRoleSchema,
   updateUserSchema,
-  userIdSchema,
+  getUserByIdSchema,
 } from "../schemas/auth.schema";
 
 const userRoutes = Router();
@@ -30,7 +30,7 @@ userRoutes.get(
   "/:id",
   authenticate,
   authorizeRoles(["admin", "user"]),
-  validate(userIdSchema),
+  validate(getUserByIdSchema),
   UserController.getUserById,
 );
 
@@ -43,7 +43,7 @@ userRoutes.put(
 );
 
 userRoutes.patch(
-  "/:userId/role",
+  "/:id/role",
   authenticate,
   authorizeRoles(["admin"]),
   validate(updateUserRoleSchema),

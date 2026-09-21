@@ -1075,7 +1075,7 @@ describe("Users API", () => {
     });
   });
 
-  describe.only("PATCH /api/users/{userId}/role", () => {
+  describe("PATCH /api/users/{id}/role", () => {
     it("should return 200 and the updated user role when admin updates role from user to admin", async () => {
       // Arrange
       const user = await insertTestUser({ role: "user" });
@@ -1124,7 +1124,7 @@ describe("Users API", () => {
       });
     });
 
-    it("should return 400 when userId is not a positive integer", async () => {
+    it("should return 400 when id is not a number", async () => {
       // Arrange
       const adminToken = generateToken({ role: "admin" });
 
@@ -1143,40 +1143,14 @@ describe("Users API", () => {
         errors: [
           {
             location: "params",
-            field: "userId",
-            message: "User ID must be a positive integer",
+            field: "id",
+            message: "Invalid user ID",
           },
         ],
       });
     });
 
-    it("should return 400 when userId is 0", async () => {
-      // Arrange
-      const adminToken = generateToken({ role: "admin" });
-
-      // Act
-      const res = await sendUpdateUserRoleRequest(
-        0,
-        { role: "admin" },
-        adminToken,
-      );
-
-      // Assert
-      expect(res.status).toBe(400);
-      expect(res.body).toStrictEqual({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            location: "params",
-            field: "userId",
-            message: "User ID must be a positive integer",
-          },
-        ],
-      });
-    });
-
-    it("should return 400 when userId is not an integer", async () => {
+    it("should return 400 when id is not an integer", async () => {
       // Arrange
       const adminToken = generateToken({ role: "admin" });
 
@@ -1195,7 +1169,33 @@ describe("Users API", () => {
         errors: [
           {
             location: "params",
-            field: "userId",
+            field: "id",
+            message: "User ID must be an integer",
+          },
+        ],
+      });
+    });
+
+    it("should return 400 when id is not a positive integer", async () => {
+      // Arrange
+      const adminToken = generateToken({ role: "admin" });
+
+      // Act
+      const res = await sendUpdateUserRoleRequest(
+        0,
+        { role: "admin" },
+        adminToken,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "params",
+            field: "id",
             message: "User ID must be a positive integer",
           },
         ],
