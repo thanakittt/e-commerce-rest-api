@@ -30,26 +30,18 @@ export async function register(
   const { name, email, password, phone } = req.body;
 
   try {
-    const existingUser = await sql`
-      SELECT id FROM users WHERE email = ${email} ${
-        phone ? sql`OR phone = ${phone}` : sql``
-      }
-    `;
-
-    if (existingUser.count > 0) {
-      return res.status(409).json(userAlreadyExistsResponse);
-    }
-
     const hashedPassword = await Bun.password.hash(password);
 
-    const newUser = await sql`
-      INSERT INTO users (name, email, password, phone) VALUES (${name}, ${email}, ${hashedPassword}, ${phone ?? null}) RETURNING id, name, email, phone
+    const [newUser] = await sql`
+      INSERT INTO users (name, email, password, phone)
+      VALUES (${name}, ${email}, ${hashedPassword}, ${phone ?? null})
+      RETURNING id, name, email, phone
     `;
 
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      data: newUser[0],
+      data: newUser,
     });
   } catch (error) {
     if (error instanceof pg.PostgresError && error.code === "23505") {
