@@ -152,6 +152,28 @@ describe("POST /api/auth/register", () => {
     });
   });
 
+  it("should return 400 when phone format is invalid", async () => {
+    // Act
+    const res = await sendRegisterRequest({
+      ...validUserData,
+      phone: "12345",
+    });
+
+    // Assert
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({
+      success: false,
+      message: "Validation failed",
+      errors: [
+        {
+          location: "body",
+          field: "phone",
+          message: "Invalid phone number format",
+        },
+      ],
+    });
+  });
+
   it("should return 400 when password is less than 8 characters", async () => {
     // Act
     const res = await sendRegisterRequest({

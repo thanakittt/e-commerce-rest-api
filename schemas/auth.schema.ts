@@ -16,7 +16,11 @@ const password = z
   .string({ error: "Password is required" })
   .min(8, { error: "Password must be at least 8 characters long" });
 
-const phone = z.string().trim().nullish();
+const phone = z
+  .string()
+  .trim()
+  .regex(/^0\d{9}$/, { error: "Invalid phone number format" })
+  .nullish();
 
 const role = z.enum(["user", "admin"], {
   error: "Invalid role. Allowed values: user, admin",

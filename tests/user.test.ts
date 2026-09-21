@@ -604,6 +604,32 @@ describe("Users API", () => {
       });
     });
 
+    it("should return 400 when phone format is invalid", async () => {
+      // Arrange
+      const token = generateToken();
+
+      // Act
+      const res = await sendUpdateUserByIdRequest(
+        1,
+        { ...updatedUserData, phone: "invalid-phone" },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "phone",
+            message: "Invalid phone number format",
+          },
+        ],
+      });
+    });
+
     it("should return 400 when unrecognized fields are provided", async () => {
       // Arrange
       const token = generateToken();
@@ -937,6 +963,31 @@ describe("Users API", () => {
             location: "body",
             field: "email",
             message: "Invalid email address",
+          },
+        ],
+      });
+    });
+
+    it("should return 400 when phone format is invalid", async () => {
+      // Arrange
+      const token = generateToken();
+
+      // Act
+      const res = await sendUpdateUserProfileRequest(
+        { ...updatedProfileData, phone: "invalid-phone" },
+        token,
+      );
+
+      // Assert
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            location: "body",
+            field: "phone",
+            message: "Invalid phone number format",
           },
         ],
       });
