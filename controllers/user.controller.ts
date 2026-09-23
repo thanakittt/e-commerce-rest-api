@@ -1,20 +1,23 @@
-import type { NextFunction, Request, Response } from "express";
-import sql from "../db";
-import pg from "postgres";
+import type { NextFunction, Response } from "express";
+import type { AuthenticatedRequest } from "../types/express";
+import type { ApiEnvelope, UserResponse, UserRoleResponse } from "../types/api";
+import type { SafeUserRow, UserRoleRow } from "../types/db";
 import type {
   UpdateUserInput,
   UpdateUserProfileInput,
   UpdateUserRoleInput,
 } from "../schemas/user.schema";
+import sql from "../db";
+import pg from "postgres";
 
 export async function getAllUsers(
-  _req: Request,
-  res: Response,
+  _req: AuthenticatedRequest<{}, ApiEnvelope<UserResponse[]>>,
+  res: Response<ApiEnvelope<UserResponse[]>>,
   next: NextFunction,
 ) {
   try {
     const users =
-      await sql`SELECT id, name, email, phone, role FROM users ORDER BY id ASC`;
+      await sql<SafeUserRow[]>`SELECT id, name, email, phone, role FROM users ORDER BY id ASC`;
 
     return res.status(200).json({
       success: true,
@@ -27,12 +30,13 @@ export async function getAllUsers(
 }
 
 export async function getUserById(
-  req: Request<{ id: string }>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<UserResponse>>,
+  res: Response<ApiEnvelope<UserResponse>>,
   next: NextFunction,
 ) {
   try {
-    const isOwner = req.userId === Number(req.params.id);
+    const targetUserId = Number(req.params.id);
+    const isOwner = req.userId === targetUserId;
     const isAdmin = req.userRole === "admin";
     const hasPermission = isOwner || isAdmin;
 
@@ -44,7 +48,7 @@ export async function getUserById(
     }
 
     const [user] =
-      await sql`SELECT id, name, email, phone, role FROM users WHERE id = ${Number(req.params.id)}`;
+      await sql<SafeUserRow[]>`SELECT id, name, email, phone, role FROM users WHERE id = ${targetUserId}`;
 
     if (!user) {
       return res.status(404).json({
@@ -64,8 +68,8 @@ export async function getUserById(
 }
 
 export async function updateUserById(
-  req: Request<{ id: string }, {}, UpdateUserInput>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<UserResponse>, UpdateUserInput>,
+  res: Response<ApiEnvelope<UserResponse>>,
   next: NextFunction,
 ) {
   try {
@@ -82,7 +86,7 @@ export async function updateUserById(
       });
     }
 
-    const [user] = await sql`
+    const [user] = await sql<SafeUserRow[]>`
       UPDATE users 
       SET name = ${name}, email = ${email}, phone = ${phone ?? null} 
       WHERE id = ${idToUpdate} 
@@ -129,24 +133,16 @@ export async function updateUserById(
 }
 
 export async function getUserProfile(
-  req: Request,
-  res: Response,
+  req: AuthenticatedRequest<{}, ApiEnvelope<UserResponse>>,
+  res: Response<ApiEnvelope<UserResponse>>,
   next: NextFunction,
 ) {
   try {
-    const userId = Number(req.userId);
+    const userId = req.userId;
 
-    const [user] = await sql<
-      [
-        {
-          id: number;
-          name: string;
-          email: string;
-          phone: string | null;
-          role: string;
-        },
-      ]
-    >`SELECT id, name, email, phone, role FROM users WHERE id = ${userId}`;
+    const [user] = await sql<SafeUserRow[]>`
+      SELECT id, name, email, phone, role FROM users WHERE id = ${userId}
+    `;
 
     if (!user) {
       return res.status(404).json({
@@ -166,25 +162,15 @@ export async function getUserProfile(
 }
 
 export async function updateUserProfile(
-  req: Request<{}, {}, UpdateUserProfileInput>,
-  res: Response,
+  req: AuthenticatedRequest<{}, ApiEnvelope<UserResponse>, UpdateUserProfileInput>,
+  res: Response<ApiEnvelope<UserResponse>>,
   next: NextFunction,
 ) {
   try {
-    const userId = Number(req.userId);
+    const userId = req.userId;
     const { name, email, phone } = req.body;
 
-    const [user] = await sql<
-      [
-        {
-          id: number;
-          name: string;
-          email: string;
-          phone: string | null;
-          role: string;
-        },
-      ]
-    >`
+    const [user] = await sql<SafeUserRow[]>`
       UPDATE users 
       SET name = ${name}, email = ${email}, phone = ${phone ?? null} 
       WHERE id = ${userId} 
@@ -231,22 +217,15 @@ export async function updateUserProfile(
 }
 
 export async function updateUserRole(
-  req: Request<{ id: string }, {}, UpdateUserRoleInput>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<UserRoleResponse>, UpdateUserRoleInput>,
+  res: Response<ApiEnvelope<UserRoleResponse>>,
   next: NextFunction,
 ) {
   try {
     const userId = Number(req.params.id);
     const { role } = req.body;
 
-    const [user] = await sql<
-      [
-        {
-          id: number;
-          role: string;
-        },
-      ]
-    >`
+    const [user] = await sql<UserRoleRow[]>`
       UPDATE users 
       SET role = ${role} 
       WHERE id = ${userId} 

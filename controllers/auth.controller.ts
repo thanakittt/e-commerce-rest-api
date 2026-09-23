@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import type { LoginInput, RegisterInput } from "../schemas/user.schema";
+import type { ApiEnvelope, AuthTokenResponse } from "../types/api";
+import type { AuthLoginRow, AuthRegisterRow } from "../types/db";
 import sql from "../db";
 import pg from "postgres";
 import jwt from "jsonwebtoken";
@@ -15,16 +17,16 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const userAlreadyExistsResponse = {
   success: false,
   message: "User already exists",
-};
+} as const;
 
 const invalidCredentialsResponse = {
   success: false,
   message: "Invalid credentials",
-};
+} as const;
 
 export async function register(
-  req: Request<{}, {}, RegisterInput>,
-  res: Response,
+  req: Request<{}, ApiEnvelope<AuthRegisterRow>, RegisterInput>,
+  res: Response<ApiEnvelope<AuthRegisterRow>>,
   next: NextFunction,
 ) {
   const { name, email, password, phone } = req.body;
@@ -32,7 +34,7 @@ export async function register(
   try {
     const hashedPassword = await Bun.password.hash(password);
 
-    const [newUser] = await sql`
+    const [newUser] = await sql<AuthRegisterRow[]>`
       INSERT INTO users (name, email, password, phone)
       VALUES (${name}, ${email}, ${hashedPassword}, ${phone ?? null})
       RETURNING id, name, email, phone
@@ -53,15 +55,16 @@ export async function register(
 }
 
 export async function login(
-  req: Request<{}, {}, LoginInput>,
-  res: Response,
+  req: Request<{}, ApiEnvelope<AuthTokenResponse>, LoginInput>,
+  res: Response<ApiEnvelope<AuthTokenResponse>>,
   next: NextFunction,
 ) {
   const { email, password } = req.body;
 
   try {
-    const [user] =
-      await sql`SELECT id, password, role FROM users WHERE email = ${email}`;
+    const [user] = await sql<AuthLoginRow[]>`
+      SELECT id, password, role FROM users WHERE email = ${email}
+    `;
 
     if (!user) {
       return res.status(401).json(invalidCredentialsResponse);

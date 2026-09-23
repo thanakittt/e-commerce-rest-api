@@ -1,43 +1,22 @@
-import type { Request, Response, NextFunction } from "express";
-import sql from "../db";
+import type { NextFunction, Response } from "express";
+import type { AuthenticatedRequest } from "../types/express";
+import type {
+  ApiEnvelope,
+  CancelledOrderResponse,
+  OrderDetailResponse,
+} from "../types/api";
+import type {
+  CancelledOrderRow,
+  OrderDetailRow,
+  OrderStatusRow,
+} from "../types/db";
 import type {
   CancelOrderInput,
   UpdateOrderStatusInput,
 } from "../schemas/order.schema";
+import sql from "../db";
 
-interface FormattedOrderItem {
-  productId: number;
-  name: string;
-  unitPrice: string;
-  quantity: number;
-  subtotal: string;
-}
-
-interface OrderDetailRow {
-  id: number;
-  userId: number;
-  orderDate: Date;
-  status: string;
-  shippingAddress: string;
-  paymentMethod: string;
-  cancellationReason: string | null;
-  items: FormattedOrderItem[];
-  totalPrice: string;
-  totalQuantity: number;
-}
-
-interface OrderStatusRow {
-  userId: number;
-  status: string;
-}
-
-interface CancelledOrderRow {
-  id: number;
-  status: string;
-  cancellationReason: string | null;
-}
-
-function formatOrderDetail(order: OrderDetailRow) {
+function formatOrderDetail(order: OrderDetailRow): OrderDetailResponse {
   return {
     ...order,
     totalPrice: Number(order.totalPrice).toFixed(2),
@@ -45,12 +24,12 @@ function formatOrderDetail(order: OrderDetailRow) {
 }
 
 export async function getOrdersByUserId(
-  req: Request,
-  res: Response,
+  req: AuthenticatedRequest<{}, ApiEnvelope<OrderDetailResponse[]>>,
+  res: Response<ApiEnvelope<OrderDetailResponse[]>>,
   next: NextFunction,
 ) {
   try {
-    const userId = req.userId!;
+    const userId = req.userId;
 
     const orders = await sql<OrderDetailRow[]>`
         SELECT 
@@ -94,8 +73,8 @@ export async function getOrdersByUserId(
 }
 
 export async function getAllOrders(
-  _req: Request,
-  res: Response,
+  _req: AuthenticatedRequest<{}, ApiEnvelope<OrderDetailResponse[]>>,
+  res: Response<ApiEnvelope<OrderDetailResponse[]>>,
   next: NextFunction,
 ) {
   try {
@@ -140,16 +119,16 @@ export async function getAllOrders(
 }
 
 export async function getOrderById(
-  req: Request<{ id: string }>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<OrderDetailResponse>>,
+  res: Response<ApiEnvelope<OrderDetailResponse>>,
   next: NextFunction,
 ) {
   try {
     const orderId = Number(req.params.id);
-    const userId = req.userId!;
-    const userRole = req.userRole!;
+    const userId = req.userId;
+    const userRole = req.userRole;
 
-    const [orderDetail] = await sql<[OrderDetailRow]>`
+    const [orderDetail] = await sql<OrderDetailRow[]>`
         SELECT 
             o.id,
             o.user_id as "userId",
@@ -208,17 +187,17 @@ export async function getOrderById(
 }
 
 export async function cancelOrder(
-  req: Request<{ id: string }, {}, CancelOrderInput>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<CancelledOrderResponse>, CancelOrderInput>,
+  res: Response<ApiEnvelope<CancelledOrderResponse>>,
   next: NextFunction,
 ) {
   try {
-    const userId = req.userId!;
-    const userRole = req.userRole!;
+    const userId = req.userId;
+    const userRole = req.userRole;
     const orderId = Number(req.params.id);
     const reason = req.body.reason ?? null;
 
-    const [order] = await sql<[OrderStatusRow]>`
+    const [order] = await sql<OrderStatusRow[]>`
       SELECT user_id as "userId", status
       FROM orders
       WHERE id = ${orderId}
@@ -250,7 +229,7 @@ export async function cancelOrder(
       });
     }
 
-    const [updatedOrder] = await sql<[CancelledOrderRow]>`
+    const [updatedOrder] = await sql<CancelledOrderRow[]>`
       UPDATE orders
       SET
         status = 'cancelled',
@@ -282,8 +261,8 @@ export async function cancelOrder(
 }
 
 export async function updateOrderStatus(
-  req: Request<{ orderId: string }, {}, UpdateOrderStatusInput>,
-  res: Response,
+  req: AuthenticatedRequest<{ orderId: string }, ApiEnvelope<CancelledOrderResponse>, UpdateOrderStatusInput>,
+  res: Response<ApiEnvelope<CancelledOrderResponse>>,
   next: NextFunction,
 ) {
   try {
@@ -291,7 +270,7 @@ export async function updateOrderStatus(
     const { status, cancellationReason } = req.body;
     const reason = status === "cancelled" ? (cancellationReason ?? null) : null;
 
-    const [updatedOrder] = await sql<[CancelledOrderRow]>`
+    const [updatedOrder] = await sql<CancelledOrderRow[]>`
       UPDATE orders
       SET
         status = ${status},
@@ -319,4 +298,3 @@ export async function updateOrderStatus(
     next(error);
   }
 }
-

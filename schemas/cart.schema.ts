@@ -82,4 +82,7 @@ export type DeleteCartItemInput = z.infer<
 >["params"];
 export type CheckoutBodyInput = z.infer<typeof checkoutSchema>["body"];
 export type CheckoutParamsInput = z.infer<typeof checkoutSchema>["params"];
+export type UpdateCartItemBodyInput = z.infer<typeof updateCartItemSchema>["body"];
+export type UpdateCartItemParamsInput = z.infer<typeof updateCartItemSchema>["params"];
+export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>;
 

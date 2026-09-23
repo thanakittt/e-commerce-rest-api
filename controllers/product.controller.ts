@@ -1,27 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
+import type { AuthenticatedRequest } from "../types/express";
+import type { ApiEnvelope, ProductResponse } from "../types/api";
+import type { ProductRow } from "../types/db";
+import type { CreateProductInput, GetProductsQueryInput } from "../schemas/product.schema";
 import sql from "../db";
 import pg from "postgres";
-import type { CreateProductInput } from "../schemas/product.schema";
 
 const PG_FOREIGN_KEY_VIOLATION = "23503";
-
-interface ProductRow {
-  id: number;
-  name: string;
-  description: string | null;
-  price: string;
-  category_id: number | null;
-  stock: number;
-}
-
-interface ProductResponse {
-  id: number;
-  name: string;
-  description: string | null;
-  price: string;
-  stock: number;
-  categoryId: number | null;
-}
 
 function formatProductResponse(product: ProductRow): ProductResponse {
   return {
@@ -35,15 +20,15 @@ function formatProductResponse(product: ProductRow): ProductResponse {
 }
 
 export async function getAllProducts(
-  req: Request,
-  res: Response,
+  req: Request<{}, ApiEnvelope<ProductResponse[]>, {}, GetProductsQueryInput>,
+  res: Response<ApiEnvelope<ProductResponse[]>>,
   next: NextFunction,
 ) {
   try {
-    const categoryId = req.query.categoryId;
+    const categoryId = req.query?.categoryId;
     const products =
       categoryId !== undefined
-        ? await sql<ProductRow[]>`SELECT * FROM products WHERE category_id = ${categoryId as any}`
+        ? await sql<ProductRow[]>`SELECT * FROM products WHERE category_id = ${categoryId}`
         : await sql<ProductRow[]>`SELECT * FROM products`;
 
     return res.status(200).json({
@@ -57,14 +42,14 @@ export async function getAllProducts(
 }
 
 export async function getProductById(
-  req: Request<{ id: string }>,
-  res: Response,
+  req: Request<{ id: string }, ApiEnvelope<ProductResponse>>,
+  res: Response<ApiEnvelope<ProductResponse>>,
   next: NextFunction,
 ) {
   const productId = Number(req.params.id);
 
   try {
-    const [product] = await sql<[ProductRow?]>`
+    const [product] = await sql<ProductRow[]>`
       SELECT * FROM products WHERE id = ${productId}
     `;
 
@@ -86,8 +71,8 @@ export async function getProductById(
 }
 
 export async function createProduct(
-  req: Request<{}, {}, CreateProductInput>,
-  res: Response,
+  req: AuthenticatedRequest<{}, ApiEnvelope<ProductResponse>, CreateProductInput>,
+  res: Response<ApiEnvelope<ProductResponse>>,
   next: NextFunction,
 ) {
   const {
@@ -99,7 +84,7 @@ export async function createProduct(
   } = req.body;
 
   try {
-    const [newProduct] = await sql<[ProductRow]>`
+    const [newProduct] = await sql<ProductRow[]>`
       INSERT INTO products (name, description, price, stock, category_id)
       VALUES (
         ${name},
@@ -110,6 +95,13 @@ export async function createProduct(
       )
       RETURNING id, name, description, price, category_id, stock
     `;
+
+    if (!newProduct) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to create product",
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -139,8 +131,8 @@ export async function createProduct(
 }
 
 export async function updateProduct(
-  req: Request<{ id: string }, {}, CreateProductInput>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<ProductResponse>, CreateProductInput>,
+  res: Response<ApiEnvelope<ProductResponse>>,
   next: NextFunction,
 ) {
   const productId = Number(req.params.id);
@@ -153,7 +145,7 @@ export async function updateProduct(
   } = req.body;
 
   try {
-    const [updatedProduct] = await sql<[ProductRow]>`
+    const [updatedProduct] = await sql<ProductRow[]>`
       UPDATE products
       SET
         name = ${name},
@@ -200,14 +192,14 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(
-  req: Request<{ id: string }>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<void>>,
+  res: Response<ApiEnvelope<void>>,
   next: NextFunction,
 ) {
   const productId = Number(req.params.id);
 
   try {
-    const [deletedProduct] = await sql<[ProductRow?]>`
+    const [deletedProduct] = await sql<Pick<ProductRow, "id">[]>`
       DELETE FROM products
       WHERE id = ${productId}
       RETURNING id

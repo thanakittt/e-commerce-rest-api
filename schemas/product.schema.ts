@@ -60,5 +60,8 @@ export type CreateProductInput = z.infer<typeof createProductSchema>["body"];
 export type GetProductsQueryInput = z.infer<
   typeof getProductsQuerySchema
 >["query"];
-export type ProductIdInput = z.input<typeof productIdSchema>["params"];
-export type UpdateProductInput = z.input<typeof updateProductSchema>;
+export type ProductIdInput = z.infer<typeof productIdSchema>["params"];
+export type ProductParamsInput = z.infer<typeof productIdSchema>["params"];
+export type UpdateProductBodyInput = z.infer<typeof updateProductSchema>["body"];
+export type UpdateProductParamsInput = z.infer<typeof updateProductSchema>["params"];
+export type UpdateProductInput = z.infer<typeof updateProductSchema>;

@@ -1,18 +1,16 @@
 import type { NextFunction, Request, Response } from "express";
+import type { AuthenticatedRequest } from "../types/express";
+import type { ApiEnvelope, CategoryResponse } from "../types/api";
+import type { CategoryRow } from "../types/db";
+import type { CreateCategoryInput } from "../schemas/category.schema";
 import sql from "../db";
 import pg from "postgres";
-import type { CreateCategoryInput } from "../schemas/category.schema";
 
 const PG_UNIQUE_VIOLATION = "23505";
 
-interface CategoryRow {
-  id: number;
-  name: string;
-}
-
 export async function getAllCategories(
-  _req: Request,
-  res: Response,
+  _req: Request<{}, ApiEnvelope<CategoryResponse[]>>,
+  res: Response<ApiEnvelope<CategoryResponse[]>>,
   next: NextFunction,
 ) {
   try {
@@ -31,14 +29,14 @@ export async function getAllCategories(
 }
 
 export async function createCategory(
-  req: Request<{}, {}, CreateCategoryInput>,
-  res: Response,
+  req: AuthenticatedRequest<{}, ApiEnvelope<CategoryResponse>, CreateCategoryInput>,
+  res: Response<ApiEnvelope<CategoryResponse>>,
   next: NextFunction,
 ) {
   const { name } = req.body;
 
   try {
-    const [newCategory] = await sql<[CategoryRow]>`
+    const [newCategory] = await sql<CategoryRow[]>`
       INSERT INTO categories (name)
       VALUES (${name})
       RETURNING id, name

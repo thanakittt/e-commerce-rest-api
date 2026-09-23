@@ -1,48 +1,26 @@
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Response } from "express";
+import type { AuthenticatedRequest } from "../types/express";
+import type {
+  ApiEnvelope,
+  CartItemResponse,
+  CartResponse,
+  CheckoutOrderResponse,
+} from "../types/api";
+import type {
+  CartItemDetailRow,
+  CartItemRow,
+  CartOwnerRow,
+  CartRow,
+  CheckoutCartItemRow,
+  CreatedOrderRow,
+  ProductStockRow,
+} from "../types/db";
 import type {
   CheckoutBodyInput,
-  CheckoutParamsInput,
   CreateCartInput,
+  UpdateCartItemBodyInput,
 } from "../schemas/cart.schema";
 import sql from "../db";
-
-interface ProductStock {
-  id: number;
-  stock: number;
-}
-
-interface CartRow {
-  id: number;
-}
-
-interface CartOwnerRow {
-  id: number;
-  user_id: number;
-}
-
-interface CartItemRow {
-  id: number;
-  name: string;
-  price: string;
-  quantity: number;
-  subtotal: string;
-}
-
-interface CartItemResponse {
-  productId: number;
-  name: string;
-  price: string;
-  quantity: number;
-  subtotal: string;
-}
-
-interface CartResponse {
-  id: number;
-  userId: number;
-  items: CartItemResponse[];
-  totalPrice: string;
-  totalQuantity: number;
-}
 
 function canAccessCart(
   cartUserId: number,
@@ -53,20 +31,20 @@ function canAccessCart(
 }
 
 async function findCartById(cartId: number): Promise<CartOwnerRow | undefined> {
-  const [cart] = await sql<[CartOwnerRow?]>`
+  const [cart] = await sql<CartOwnerRow[]>`
     SELECT id, user_id FROM carts WHERE id = ${cartId}
   `;
   return cart;
 }
 
-async function getCartItems(cartId: number): Promise<CartItemRow[]> {
-  return sql<CartItemRow[]>`
+async function getCartItems(cartId: number): Promise<CartItemDetailRow[]> {
+  return sql<CartItemDetailRow[]>`
     SELECT
       p.id,
       p.name,
       p.price,
       ci.quantity,
-      (p.price * ci.quantity) AS subtotal
+      (p.price * ci.quantity)::text AS subtotal
     FROM cart_items AS ci
     JOIN products AS p ON ci.product_id = p.id
     WHERE ci.cart_id = ${cartId}
@@ -91,12 +69,12 @@ function sendValidationError(res: Response, field: string, message: string) {
 function formatCartResponse(
   cartId: number,
   userId: number,
-  cartItems: CartItemRow[],
+  cartItems: CartItemDetailRow[],
 ): CartResponse {
   let totalPrice = 0;
   let totalQuantity = 0;
 
-  const items = cartItems.map((item) => {
+  const items: CartItemResponse[] = cartItems.map((item) => {
     const subtotal = parseFloat(item.subtotal);
     totalPrice += subtotal;
     totalQuantity += item.quantity;
@@ -120,15 +98,15 @@ function formatCartResponse(
 }
 
 export async function createCart(
-  req: Request<{}, {}, CreateCartInput>,
-  res: Response,
+  req: AuthenticatedRequest<{}, ApiEnvelope<CartResponse>, CreateCartInput>,
+  res: Response<ApiEnvelope<CartResponse>>,
   next: NextFunction,
 ) {
   try {
-    const userId = req.userId!;
+    const userId = req.userId;
     const { productId, quantity } = req.body;
 
-    const [product] = await sql<[ProductStock?]>`
+    const [product] = await sql<ProductStockRow[]>`
       SELECT id, stock FROM products WHERE id = ${productId}
     `;
 
@@ -136,7 +114,7 @@ export async function createCart(
       return sendValidationError(res, "productId", "Product not found");
     }
 
-    const [existingItem] = await sql<[{ quantity: number }?]>`
+    const [existingItem] = await sql<Pick<CartItemRow, "quantity">[]>`
       SELECT ci.quantity
       FROM carts c
       JOIN cart_items ci ON ci.cart_id = c.id
@@ -152,15 +130,23 @@ export async function createCart(
       );
     }
 
-    const [cart] = await sql<[CartRow]>`
+    const [cart] = await sql<Pick<CartRow, "id">[]>`
       INSERT INTO carts (user_id)
       VALUES (${userId})
       ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id
       RETURNING id
     `;
+
+    if (!cart) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to create cart",
+      });
+    }
+
     const cartId = cart.id;
 
-    await sql`
+    await sql<CartItemRow[]>`
       INSERT INTO cart_items (cart_id, product_id, quantity)
       VALUES (${cartId}, ${productId}, ${quantity})
       ON CONFLICT (cart_id, product_id)
@@ -180,13 +166,13 @@ export async function createCart(
 }
 
 export async function getCartById(
-  req: Request<{ id: string }>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<CartResponse>>,
+  res: Response<ApiEnvelope<CartResponse>>,
   next: NextFunction,
 ) {
   try {
-    const userId = req.userId!;
-    const userRole = req.userRole!;
+    const userId = req.userId;
+    const userRole = req.userRole;
     const cartId = Number(req.params.id);
 
     const cart = await findCartById(cartId);
@@ -217,13 +203,13 @@ export async function getCartById(
 }
 
 export async function deleteCartById(
-  req: Request<{ id: string }>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<void>>,
+  res: Response<ApiEnvelope<void>>,
   next: NextFunction,
 ) {
   try {
-    const userId = req.userId!;
-    const userRole = req.userRole!;
+    const userId = req.userId;
+    const userRole = req.userRole;
     const cartId = Number(req.params.id);
 
     const cart = await findCartById(cartId);
@@ -241,7 +227,7 @@ export async function deleteCartById(
       });
     }
 
-    await sql`
+    await sql<CartRow[]>`
       DELETE FROM carts WHERE id = ${cartId}
     `;
 
@@ -255,13 +241,13 @@ export async function deleteCartById(
 }
 
 export async function deleteCartItem(
-  req: Request<{ cartId: string; productId: string }>,
-  res: Response,
+  req: AuthenticatedRequest<{ cartId: string; productId: string }, ApiEnvelope<void>>,
+  res: Response<ApiEnvelope<void>>,
   next: NextFunction,
 ) {
   try {
-    const userId = req.userId!;
-    const userRole = req.userRole!;
+    const userId = req.userId;
+    const userRole = req.userRole;
     const cartId = Number(req.params.cartId);
     const productId = Number(req.params.productId);
 
@@ -280,7 +266,7 @@ export async function deleteCartItem(
       });
     }
 
-    await sql`
+    await sql<CartItemRow[]>`
       DELETE FROM cart_items WHERE cart_id = ${cartId} AND product_id = ${productId}
     `;
 
@@ -294,13 +280,17 @@ export async function deleteCartItem(
 }
 
 export async function updateCartItem(
-  req: Request<{ cartId: string; productId: string }, {}, { quantity: number }>,
-  res: Response,
+  req: AuthenticatedRequest<
+    { cartId: string; productId: string },
+    ApiEnvelope<CartResponse>,
+    UpdateCartItemBodyInput
+  >,
+  res: Response<ApiEnvelope<CartResponse>>,
   next: NextFunction,
 ) {
   try {
-    const userId = req.userId!;
-    const userRole = req.userRole!;
+    const userId = req.userId;
+    const userRole = req.userRole;
     const cartId = Number(req.params.cartId);
     const productId = Number(req.params.productId);
     const { quantity } = req.body;
@@ -320,7 +310,7 @@ export async function updateCartItem(
       });
     }
 
-    const [cartItem] = await sql<[{ cart_id: number; product_id: number }?]>`
+    const [cartItem] = await sql<Pick<CartItemRow, "cart_id" | "product_id">[]>`
       SELECT cart_id, product_id
       FROM cart_items
       WHERE cart_id = ${cartId} AND product_id = ${productId}
@@ -332,7 +322,7 @@ export async function updateCartItem(
       });
     }
 
-    const [product] = await sql<[ProductStock?]>`
+    const [product] = await sql<ProductStockRow[]>`
       SELECT id, stock FROM products WHERE id = ${productId}
     `;
 
@@ -348,7 +338,7 @@ export async function updateCartItem(
       );
     }
 
-    await sql`
+    await sql<CartItemRow[]>`
       UPDATE cart_items SET quantity = ${quantity} WHERE cart_id = ${cartId} AND product_id = ${productId}
     `;
     const cartItems = await getCartItems(cartId);
@@ -361,20 +351,6 @@ export async function updateCartItem(
   } catch (error) {
     next(error);
   }
-}
-
-interface CheckoutCartItemRow {
-  product_id: number;
-  name: string;
-  price: string;
-  quantity: number;
-  stock: number;
-}
-
-interface CreatedOrderRow {
-  id: number;
-  order_date: Date;
-  status: string;
 }
 
 interface ProcessCheckoutParams {
@@ -410,11 +386,15 @@ async function processOrderCheckout({
   cartItems,
 }: ProcessCheckoutParams): Promise<ProcessCheckoutResult> {
   return sql.begin(async (tx) => {
-    const [order] = await tx<[CreatedOrderRow]>`
+    const [order] = await tx<CreatedOrderRow[]>`
       INSERT INTO orders (user_id, shipping_address, payment_method)
       VALUES (${userId}, ${shippingAddress}, ${paymentMethod})
       RETURNING id, order_date, status
     `;
+
+    if (!order) {
+      throw new Error("Failed to create order");
+    }
 
     const orderItems = cartItems.map((item) => ({
       order_id: order.id,
@@ -466,7 +446,7 @@ function formatCheckoutResponse(
   totalPrice: number,
   totalQuantity: number,
   cartItems: CheckoutCartItemRow[],
-) {
+): CheckoutOrderResponse {
   return {
     id: order.id,
     userId,
@@ -487,13 +467,13 @@ function formatCheckoutResponse(
 }
 
 export async function checkout(
-  req: Request<{ id: string }, {}, CheckoutBodyInput>,
-  res: Response,
+  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<CheckoutOrderResponse>, CheckoutBodyInput>,
+  res: Response<ApiEnvelope<CheckoutOrderResponse>>,
   next: NextFunction,
 ) {
   try {
-    const userId = req.userId!;
-    const userRole = req.userRole!;
+    const userId = req.userId;
+    const userRole = req.userRole;
     const cartId = Number(req.params.id);
     const { shippingAddress, paymentMethod } = req.body;
 

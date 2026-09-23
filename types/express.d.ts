@@ -1,10 +1,11 @@
 import type { Request } from "express";
+import type { UserRole } from "./db";
 
 declare global {
   namespace Express {
     interface Request {
-      userId?: number;
-      userRole?: string;
+      userId: number;
+      userRole: UserRole | string;
     }
   }
 }
@@ -16,6 +17,5 @@ export interface AuthenticatedRequest<
   ReqQuery = any,
 > extends Request<P, ResBody, ReqBody, ReqQuery> {
   userId: number;
-  userRole: string;
+  userRole: UserRole | string;
 }
-

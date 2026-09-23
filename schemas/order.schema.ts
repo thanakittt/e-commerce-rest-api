@@ -42,7 +42,12 @@ export const updateOrderStatusSchema = z.object({
   }),
 });
 
+export type GetOrderByIdParamsInput = z.infer<typeof getOrderByIdSchema>["params"];
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>["body"];
+export type CancelOrderParamsInput = z.infer<typeof cancelOrderSchema>["params"];
 export type UpdateOrderStatusInput = z.infer<
   typeof updateOrderStatusSchema
 >["body"];
+export type UpdateOrderStatusParamsInput = z.infer<
+  typeof updateOrderStatusSchema
+>["params"];

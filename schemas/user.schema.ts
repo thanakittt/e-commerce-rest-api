@@ -91,7 +91,9 @@ export type LoginInput = z.infer<typeof loginSchema>["body"];
 
 export type GetUserByIdInput = z.infer<typeof getUserByIdSchema>["params"];
 export type UpdateUserInput = z.infer<typeof updateUserSchema>["body"];
+export type UpdateUserParamsInput = z.infer<typeof updateUserSchema>["params"];
 export type UpdateUserProfileInput = z.infer<
   typeof updateUserProfileSchema
 >["body"];
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>["body"];
+export type UpdateUserRoleParamsInput = z.infer<typeof updateUserRoleSchema>["params"];
