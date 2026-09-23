@@ -29,7 +29,6 @@ userRoutes.put(
 userRoutes.get(
   "/:id",
   authenticate,
-  authorizeRoles(["admin", "user"]),
   validate(getUserByIdSchema),
   UserController.getUserById,
 );
@@ -37,7 +36,6 @@ userRoutes.get(
 userRoutes.put(
   "/:id",
   authenticate,
-  authorizeRoles(["admin", "user"]),
   validate(updateUserSchema),
   UserController.updateUserById,
 );
