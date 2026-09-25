@@ -33,8 +33,8 @@ export async function getAllProducts(
       categoryId !== undefined
         ? await sql<
             ProductRow[]
-          >`SELECT * FROM products WHERE category_id = ${categoryId}`
-        : await sql<ProductRow[]>`SELECT * FROM products`;
+          >`SELECT * FROM products WHERE category_id = ${categoryId} ORDER BY id ASC`
+        : await sql<ProductRow[]>`SELECT * FROM products ORDER BY id ASC`;
 
     return res.status(200).json({
       success: true,
