@@ -10,6 +10,13 @@ import type {
 import sql from "../db";
 import pg from "postgres";
 
+function isOwnerOrAdmin(
+  req: Pick<AuthenticatedRequest, "userId" | "userRole">,
+  targetUserId: number,
+): boolean {
+  return req.userId === targetUserId || req.userRole === "admin";
+}
+
 export async function getAllUsers(
   _req: AuthenticatedRequest<{}, ApiEnvelope<UserResponse[]>>,
   res: Response<ApiEnvelope<UserResponse[]>>,
@@ -36,11 +43,8 @@ export async function getUserById(
 ) {
   try {
     const targetUserId = Number(req.params.id);
-    const isOwner = req.userId === targetUserId;
-    const isAdmin = req.userRole === "admin";
-    const hasPermission = isOwner || isAdmin;
 
-    if (!hasPermission) {
+    if (!isOwnerOrAdmin(req, targetUserId)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden",
@@ -75,11 +79,8 @@ export async function updateUserById(
   try {
     const idToUpdate = Number(req.params.id);
     const { name, email, phone } = req.body;
-    const isOwner = req.userId === idToUpdate;
-    const isAdmin = req.userRole === "admin";
-    const hasPermission = isOwner || isAdmin;
 
-    if (!hasPermission) {
+    if (!isOwnerOrAdmin(req, idToUpdate)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden",
