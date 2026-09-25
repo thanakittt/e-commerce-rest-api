@@ -97,7 +97,7 @@ function formatCartResponse(
   };
 }
 
-export async function createCart(
+export async function addToCart(
   req: AuthenticatedRequest<{}, ApiEnvelope<CartResponse>, CreateCartInput>,
   res: Response<ApiEnvelope<CartResponse>>,
   next: NextFunction,

@@ -17,7 +17,7 @@ cartRouter.post(
   "/",
   authenticate,
   validate(createCartSchema),
-  CartController.createCart,
+  CartController.addToCart,
 );
 
 cartRouter.get(
