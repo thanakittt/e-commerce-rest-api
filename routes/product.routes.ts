@@ -3,9 +3,10 @@ import * as ProductController from "../controllers/product.controller";
 import { validate } from "../middlewares/validate.middleware";
 import {
   createProductSchema,
-  productIdSchema,
+  deleteProductSchema,
+  getAllProductsSchema,
+  getProductByIdSchema,
   updateProductSchema,
-  getProductsQuerySchema,
 } from "../schemas/product.schema";
 import { authenticate, authorizeRoles } from "../middlewares/auth.middleware";
 
@@ -13,12 +14,12 @@ const productRouter = Router();
 
 productRouter.get(
   "/",
-  validate(getProductsQuerySchema),
+  validate(getAllProductsSchema),
   ProductController.getAllProducts,
 );
 productRouter.get(
   "/:id",
-  validate(productIdSchema),
+  validate(getProductByIdSchema),
   ProductController.getProductById,
 );
 
@@ -42,7 +43,7 @@ productRouter.delete(
   "/:id",
   authenticate,
   authorizeRoles(["admin"]),
-  validate(productIdSchema),
+  validate(deleteProductSchema),
   ProductController.deleteProduct,
 );
 

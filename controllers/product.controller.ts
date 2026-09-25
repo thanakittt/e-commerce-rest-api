@@ -2,7 +2,10 @@ import type { NextFunction, Request, Response } from "express";
 import type { AuthenticatedRequest } from "../types/express";
 import type { ApiEnvelope, ProductResponse } from "../types/api";
 import type { ProductRow } from "../types/db";
-import type { CreateProductInput, GetProductsQueryInput } from "../schemas/product.schema";
+import type {
+  CreateProductInput,
+  GetAllProductsInput,
+} from "../schemas/product.schema";
 import sql from "../db";
 import pg from "postgres";
 
@@ -20,7 +23,7 @@ function formatProductResponse(product: ProductRow): ProductResponse {
 }
 
 export async function getAllProducts(
-  req: Request<{}, ApiEnvelope<ProductResponse[]>, {}, GetProductsQueryInput>,
+  req: Request<{}, ApiEnvelope<ProductResponse[]>, {}, GetAllProductsInput>,
   res: Response<ApiEnvelope<ProductResponse[]>>,
   next: NextFunction,
 ) {
@@ -28,7 +31,9 @@ export async function getAllProducts(
     const categoryId = req.query?.categoryId;
     const products =
       categoryId !== undefined
-        ? await sql<ProductRow[]>`SELECT * FROM products WHERE category_id = ${categoryId}`
+        ? await sql<
+            ProductRow[]
+          >`SELECT * FROM products WHERE category_id = ${categoryId}`
         : await sql<ProductRow[]>`SELECT * FROM products`;
 
     return res.status(200).json({
@@ -71,7 +76,11 @@ export async function getProductById(
 }
 
 export async function createProduct(
-  req: AuthenticatedRequest<{}, ApiEnvelope<ProductResponse>, CreateProductInput>,
+  req: AuthenticatedRequest<
+    {},
+    ApiEnvelope<ProductResponse>,
+    CreateProductInput
+  >,
   res: Response<ApiEnvelope<ProductResponse>>,
   next: NextFunction,
 ) {
@@ -131,7 +140,11 @@ export async function createProduct(
 }
 
 export async function updateProduct(
-  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<ProductResponse>, CreateProductInput>,
+  req: AuthenticatedRequest<
+    { id: string },
+    ApiEnvelope<ProductResponse>,
+    CreateProductInput
+  >,
   res: Response<ApiEnvelope<ProductResponse>>,
   next: NextFunction,
 ) {
