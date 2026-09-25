@@ -11,6 +11,28 @@ import pg from "postgres";
 
 const PG_FOREIGN_KEY_VIOLATION = "23503";
 
+function handleProductForeignKeyError(error: unknown, res: Response): boolean {
+  if (
+    error instanceof pg.PostgresError &&
+    error.code === PG_FOREIGN_KEY_VIOLATION
+  ) {
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: [
+        {
+          location: "body",
+          field: "categoryId",
+          message: "Category not found",
+        },
+      ],
+    });
+    return true;
+  }
+
+  return false;
+}
+
 function formatProductResponse(product: ProductRow): ProductResponse {
   return {
     id: product.id,
@@ -118,22 +140,7 @@ export async function createProduct(
       data: formatProductResponse(newProduct),
     });
   } catch (error) {
-    if (
-      error instanceof pg.PostgresError &&
-      error.code === PG_FOREIGN_KEY_VIOLATION
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            location: "body",
-            field: "categoryId",
-            message: "Category not found",
-          },
-        ],
-      });
-    }
+    if (handleProductForeignKeyError(error, res)) return;
 
     next(error);
   }
@@ -183,22 +190,7 @@ export async function updateProduct(
       data: formatProductResponse(updatedProduct),
     });
   } catch (error) {
-    if (
-      error instanceof pg.PostgresError &&
-      error.code === PG_FOREIGN_KEY_VIOLATION
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            location: "body",
-            field: "categoryId",
-            message: "Category not found",
-          },
-        ],
-      });
-    }
+    if (handleProductForeignKeyError(error, res)) return;
 
     next(error);
   }
