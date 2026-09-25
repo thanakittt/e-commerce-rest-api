@@ -4,7 +4,7 @@ import { authenticate } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   checkoutSchema,
-  createCartSchema,
+  addToCartSchema,
   deleteCartByIdSchema,
   deleteCartItemSchema,
   getCartByIdSchema,
@@ -16,7 +16,7 @@ const cartRouter = Router();
 cartRouter.post(
   "/",
   authenticate,
-  validate(createCartSchema),
+  validate(addToCartSchema),
   CartController.addToCart,
 );
 
@@ -56,4 +56,3 @@ cartRouter.post(
 );
 
 export default cartRouter;
-

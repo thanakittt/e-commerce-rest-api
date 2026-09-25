@@ -17,7 +17,7 @@ import type {
 } from "../types/db";
 import type {
   CheckoutBodyInput,
-  CreateCartInput,
+  AddToCartInput,
   UpdateCartItemBodyInput,
 } from "../schemas/cart.schema";
 import sql from "../db";
@@ -98,7 +98,7 @@ function formatCartResponse(
 }
 
 export async function addToCart(
-  req: AuthenticatedRequest<{}, ApiEnvelope<CartResponse>, CreateCartInput>,
+  req: AuthenticatedRequest<{}, ApiEnvelope<CartResponse>, AddToCartInput>,
   res: Response<ApiEnvelope<CartResponse>>,
   next: NextFunction,
 ) {
@@ -241,7 +241,10 @@ export async function deleteCartById(
 }
 
 export async function deleteCartItem(
-  req: AuthenticatedRequest<{ cartId: string; productId: string }, ApiEnvelope<void>>,
+  req: AuthenticatedRequest<
+    { cartId: string; productId: string },
+    ApiEnvelope<void>
+  >,
   res: Response<ApiEnvelope<void>>,
   next: NextFunction,
 ) {
@@ -467,7 +470,11 @@ function formatCheckoutResponse(
 }
 
 export async function checkout(
-  req: AuthenticatedRequest<{ id: string }, ApiEnvelope<CheckoutOrderResponse>, CheckoutBodyInput>,
+  req: AuthenticatedRequest<
+    { id: string },
+    ApiEnvelope<CheckoutOrderResponse>,
+    CheckoutBodyInput
+  >,
   res: Response<ApiEnvelope<CheckoutOrderResponse>>,
   next: NextFunction,
 ) {
