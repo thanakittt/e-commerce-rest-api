@@ -17,6 +17,34 @@ function isOwnerOrAdmin(
   return req.userId === targetUserId || req.userRole === "admin";
 }
 
+function handleUserDuplicateError(error: unknown, res: Response): boolean {
+  if (error instanceof pg.PostgresError && error.code === "23505") {
+    const constraint = (
+      error.constraint_name ??
+      error.detail ??
+      ""
+    ).toLowerCase();
+
+    if (constraint.includes("email")) {
+      res.status(409).json({
+        success: false,
+        message: "Email already exists",
+      });
+      return true;
+    }
+
+    if (constraint.includes("phone")) {
+      res.status(409).json({
+        success: false,
+        message: "Phone already exists",
+      });
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export async function getAllUsers(
   _req: AuthenticatedRequest<{}, ApiEnvelope<UserResponse[]>>,
   res: Response<ApiEnvelope<UserResponse[]>>,
@@ -107,27 +135,7 @@ export async function updateUserById(
       data: user,
     });
   } catch (error) {
-    if (error instanceof pg.PostgresError && error.code === "23505") {
-      const constraint = (
-        error.constraint_name ??
-        error.detail ??
-        ""
-      ).toLowerCase();
-
-      if (constraint.includes("email")) {
-        return res.status(409).json({
-          success: false,
-          message: "Email already exists",
-        });
-      }
-
-      if (constraint.includes("phone")) {
-        return res.status(409).json({
-          success: false,
-          message: "Phone already exists",
-        });
-      }
-    }
+    if (handleUserDuplicateError(error, res)) return;
 
     next(error);
   }
@@ -191,27 +199,7 @@ export async function updateUserProfile(
       data: user,
     });
   } catch (error) {
-    if (error instanceof pg.PostgresError && error.code === "23505") {
-      const constraint = (
-        error.constraint_name ??
-        error.detail ??
-        ""
-      ).toLowerCase();
-
-      if (constraint.includes("email")) {
-        return res.status(409).json({
-          success: false,
-          message: "Email already exists",
-        });
-      }
-
-      if (constraint.includes("phone")) {
-        return res.status(409).json({
-          success: false,
-          message: "Phone already exists",
-        });
-      }
-    }
+    if (handleUserDuplicateError(error, res)) return;
 
     next(error);
   }
