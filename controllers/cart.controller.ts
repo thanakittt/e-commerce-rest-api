@@ -2,12 +2,10 @@ import type { NextFunction, Response } from "express";
 import type { AuthenticatedRequest } from "../types/express";
 import type {
   ApiEnvelope,
-  CartItemResponse,
   CartResponse,
   CheckoutOrderResponse,
 } from "../types/api";
 import type {
-  CartItemDetailRow,
   CartItemRow,
   CartOwnerRow,
   CartRow,
@@ -37,19 +35,34 @@ async function findCartById(cartId: number): Promise<CartOwnerRow | undefined> {
   return cart;
 }
 
-async function getCartItems(cartId: number): Promise<CartItemDetailRow[]> {
-  return sql<CartItemDetailRow[]>`
+async function getCartDetails(
+  cartId: number,
+): Promise<CartResponse | undefined> {
+  const [cart] = await sql<CartResponse[]>`
     SELECT
-      p.id,
-      p.name,
-      p.price,
-      ci.quantity,
-      (p.price * ci.quantity)::text AS subtotal
-    FROM cart_items AS ci
-    JOIN products AS p ON ci.product_id = p.id
-    WHERE ci.cart_id = ${cartId}
-    ORDER BY p.id ASC
+      c.id as "id",
+      c.user_id as "userId",
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'productId', p.id,
+            'name', p.name,
+            'price', p.price::text,
+            'quantity', ci.quantity,
+            'subtotal', (p.price * ci.quantity)::text
+          ) ORDER BY p.id ASC
+        ) FILTER (WHERE p.id IS NOT NULL),
+        '[]'::json
+      ) as "items",
+      COALESCE(ROUND(SUM(p.price * ci.quantity)::numeric, 2)::text, '0.00') as "totalPrice",
+      COALESCE(SUM(ci.quantity), 0)::integer as "totalQuantity"
+    FROM carts c
+    LEFT JOIN cart_items ci ON c.id = ci.cart_id
+    LEFT JOIN products p ON ci.product_id = p.id
+    WHERE c.id = ${cartId}
+    GROUP BY c.id, c.user_id
   `;
+  return cart;
 }
 
 function sendValidationError(res: Response, field: string, message: string) {
@@ -64,37 +77,6 @@ function sendValidationError(res: Response, field: string, message: string) {
       },
     ],
   });
-}
-
-function formatCartResponse(
-  cartId: number,
-  userId: number,
-  cartItems: CartItemDetailRow[],
-): CartResponse {
-  let totalPrice = 0;
-  let totalQuantity = 0;
-
-  const items: CartItemResponse[] = cartItems.map((item) => {
-    const subtotal = parseFloat(item.subtotal);
-    totalPrice += subtotal;
-    totalQuantity += item.quantity;
-
-    return {
-      productId: item.id,
-      name: item.name,
-      price: Number(item.price).toFixed(2),
-      quantity: item.quantity,
-      subtotal: subtotal.toFixed(2),
-    };
-  });
-
-  return {
-    id: cartId,
-    userId,
-    items,
-    totalPrice: totalPrice.toFixed(2),
-    totalQuantity,
-  };
 }
 
 export async function addToCart(
@@ -153,12 +135,12 @@ export async function addToCart(
       DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity
     `;
 
-    const cartItems = await getCartItems(cartId);
+    const cartDetails = await getCartDetails(cartId);
 
     return res.status(200).json({
       success: true,
       message: "Product added to cart successfully",
-      data: formatCartResponse(cartId, userId, cartItems),
+      data: cartDetails!,
     });
   } catch (error) {
     next(error);
@@ -190,12 +172,12 @@ export async function getCartById(
       });
     }
 
-    const cartItems = await getCartItems(cartId);
+    const cartDetails = await getCartDetails(cartId);
 
     return res.status(200).json({
       success: true,
       message: "Cart fetched successfully",
-      data: formatCartResponse(cartId, cart.user_id, cartItems),
+      data: cartDetails!,
     });
   } catch (error) {
     next(error);
@@ -344,12 +326,12 @@ export async function updateCartItem(
     await sql<CartItemRow[]>`
       UPDATE cart_items SET quantity = ${quantity} WHERE cart_id = ${cartId} AND product_id = ${productId}
     `;
-    const cartItems = await getCartItems(cartId);
+    const cartDetails = await getCartDetails(cartId);
 
     return res.status(200).json({
       success: true,
       message: "Item quantity updated successfully",
-      data: formatCartResponse(cartId, cart.user_id, cartItems),
+      data: cartDetails!,
     });
   } catch (error) {
     next(error);
